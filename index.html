@@ -168,6 +168,22 @@ h1{font-family:var(--f-disp);font-weight:700;font-size:30px;letter-spacing:.01em
 .stack{display:flex;flex-direction:column;gap:8px;margin-top:10px}
 .stack .btn{width:100%}
 .goalr{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.prow.gk{background:var(--done)}
+.prow.gk .nm b{text-decoration:line-through;color:var(--muted)}
+.prow .btn[aria-pressed="true"]{color:var(--accent);border-color:var(--accent)}
+.chipb{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border-radius:18px;border:1px solid var(--line);background:var(--surface2);color:var(--fg);font-size:14.5px;text-decoration:none}
+.alts{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;font-size:13px;color:var(--muted)}
+#scn{position:fixed;inset:0;z-index:25;background:var(--bg);overflow-y:auto;padding:0 16px 40px}
+#scn[hidden]{display:none}
+.scbar{padding:calc(10px + env(safe-area-inset-top,0px)) 0 8px;max-width:560px;margin-inline:auto}
+.scbar .back{min-height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-weight:600}
+.scbody{max-width:560px;margin-inline:auto}
+#scv{width:100%;max-height:55vh;border-radius:12px;background:#000;object-fit:cover;display:block}
+.scs{color:var(--muted);font-size:15px;margin:8px 0}
+.scsum{font-family:var(--f-disp);font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.ofr{padding:8px 0;border-top:1px solid var(--line)}
+.ofr:first-child{border-top:0;padding-top:0}
+.ofr.best b{color:var(--accent)}
 
 body{padding-top:env(safe-area-inset-top,0px)}</style>
 
@@ -578,8 +594,8 @@ rebuildAll();
 
 /* ---------- Kopf: Tagebuch + Haushalt ---------- */
 const ICJ='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h11a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H6z"/><path d="M6 3.5v17M10 8h5M10 12h5"/></svg>';
-const ICH='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><circle cx="17" cy="9" r="2.2"/><path d="M16 14c2.5-.3 4.5 1.2 4.5 4"/></svg>';
-document.querySelector(".ic").insertAdjacentHTML("beforeend",'<button id="bdy" aria-label="Tagebuch">'+ICJ+'</button><button id="bhh" aria-label="Haushalt teilen">'+ICH+'</button>');
+const ICH='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+document.querySelector(".ic").insertAdjacentHTML("beforeend",'<button id="bdy" aria-label="Tagebuch">'+ICJ+'</button><button id="bhh" aria-label="Einstellungen">'+ICH+'</button>');
 
 /* ---------- Eigene Rezepte ---------- */
 const CGRP={"Frühstück":"Frühstück","Hauptmahlzeit":"Hauptmahlzeit (16 Uhr)","Snack & Beilage":"Snack / Pause","Dessert":"Dessert"};
@@ -671,18 +687,19 @@ let HH=null; try{HH=JSON.parse(localStorage.getItem(HK));}catch(e){}
 const hsave=()=>{try{localStorage.setItem(HK,JSON.stringify(HH))}catch(e){}};
 const hm=(location.hash||"").match(/h=([a-z0-9]{16,64})/i);
 if(hm){HH={mode:"cloud",code:hm[1].toLowerCase()};hsave();try{history.replaceState(null,"",location.pathname+location.search);}catch(e){}}
-const SH=["sel","sc","fr","cust"];
-let fbRef=null,unsub=null,last={},syncState="off";
+const SH=["sel","sc","fr","cust","done","offers"];
+let fbRef=null,unsub=null,last={},syncState="off",ready=false;
 function chip(){const b=$("#bhh");if(!b)return;b.classList.toggle("sync",syncState==="online");b.classList.toggle("err",syncState==="error");}
-function stopSync(){if(unsub){unsub();unsub=null}fbRef=null;last={};syncState="off";chip();}
+function stopSync(){if(unsub){unsub();unsub=null}fbRef=null;last={};ready=false;syncState="off";chip();}
 function startSync(){
   if(!window.FB||!HH||HH.mode!=="cloud"||!HH.code) return; stopSync();
   fbRef=FB.doc(FB.db,"households",HH.code);
   unsub=FB.onSnapshot(fbRef,snap=>{
     if(snap.metadata.hasPendingWrites) return;
     syncState=snap.metadata.fromCache?"off":"online"; chip();
-    if(!snap.exists()){if(!snap.metadata.fromCache)pushShared(true);return}
+    if(!snap.exists()){if(!snap.metadata.fromCache){ready=true;pushShared(true);}return}
     applyRemote(snap.data());
+    if(!snap.metadata.fromCache) ready=true;
   },()=>{syncState="error";chip();});
 }
 function applyRemote(d){
@@ -696,10 +713,10 @@ function applyRemote(d){
 }
 flush=function(){pushShared(false);};
 function pushShared(force){
-  if(!fbRef) return;
+  if(!fbRef||!ready) return;
   if(saving){dirty=true;return}
   const o={},sent=[];
-  SH.forEach(k=>{const s=JSON.stringify(ST[k]||(k==="cust"?[]:{})); if(force||s!==last[k]){o[k+"S"]=s;sent.push(k);last[k]=s;}});
+  SH.forEach(k=>{const s=JSON.stringify(ST[k]||(k==="cust"||k==="offers"?[]:{})); if(force||s!==last[k]){o[k+"S"]=s;sent.push(k);last[k]=s;}});
   if(!sent.length) return;
   o.u=Date.now(); saving=true;
   FB.setDoc(fbRef,o,{merge:true}).catch(()=>{sent.forEach(k=>{last[k]=undefined});syncState="error";chip();}).finally(()=>{saving=false;if(dirty){dirty=false;pushShared(false);}});
@@ -709,7 +726,7 @@ function newCode(){const a=new Uint8Array(20);crypto.getRandomValues(a);return A
 function hhHtml(){
   const cloud=HH&&HH.mode==="cloud"&&HH.code;
   return `<div class="dtop"><div class="in"><button class="back" data-pc>${HH?"Schließen":"Später"}</button></div></div>
-  <div class="dbody"><h2>Haushalt</h2>`+(cloud?
+  <div class="dbody"><h2>Einstellungen</h2><h3 class="sec" style="margin-top:4px">Haushalt und Teilen</h3>`+(cloud?
   `<p class="note" style="margin-top:0">Alle, die diesen Code haben, sehen denselben Plan, dieselbe Einkaufsliste, denselben Kühlschrank und dieselben eigenen Rezepte, sofort auf allen Handys. ${window.FB?(syncState==="online"?"Verbunden.":syncState==="error"?"Verbindung gestört, die Änderungen werden später gesendet.":"Verbinde …"):"Keine Verbindung zum Server, die App arbeitet lokal weiter."}</p>
    <div class="code">${esc(HH.code)}</div>
    <div class="stack"><button class="btn pri" data-hhshare>Link teilen</button><button class="btn" data-hhcopy>Code kopieren</button><button class="btn warn" id="hhleave">Haushalt verlassen</button></div>
@@ -733,7 +750,11 @@ document.addEventListener("click",ev=>{
   if(d.crsave!==undefined){saveCr(d.crsave);return}
   if(d.cred){openCr(d.cred);return}
   if(d.crdel){ if(t.dataset.c){ST.cust=ST.cust.filter(c=>c.id!==d.crdel);delete ST.sel[d.crdel];delete ST.rc[d.crdel];rebuildAll();persist();closeRecipe();toast("Rezept gelöscht")} else {t.dataset.c=1;t.textContent="Wirklich löschen?";setTimeout(()=>{if(t.isConnected){delete t.dataset.c;t.textContent="Löschen"}},3500)} return}
-  if(d.dyadd){const r=all[d.dyadd];addEntry({n:r.n,k:r.k,p:r.p,rid:r.id},dkey(new Date()));toast("Heute eingetragen: "+r.n);return}
+  if(d.dyadd){const r=all[d.dyadd];addEntry({n:r.n,k:r.k,p:r.p,rid:r.id},dkey(new Date()));
+    if(ST.sel[r.id]){(ST.done||(ST.done={}))[r.id]=1;persist();}
+    toast(ST.sel[r.id]?"Eingetragen, im Plan als gegessen markiert":"Heute eingetragen: "+r.n);return}
+  if(d.gk){const dn=ST.done||(ST.done={}); if(dn[d.gk]) delete dn[d.gk]; else dn[d.gk]=1; persist(); const y=window.scrollY; render(); window.scrollTo(0,y); return}
+  if(t.id==="clrdone"){const dn=ST.done||{};Object.keys(dn).forEach(k=>{delete ST.sel[k];delete dn[k];});persist();render();toast("Erledigte entfernt");return}
   if(pm==="Y"&&!pnl.hidden){
     if(d.dyd){const x=new Date(dyk+"T12:00:00");x.setDate(x.getDate()+parseInt(d.dyd));if(dkey(x)<=dkey(new Date())){dyk=dkey(x);drawDy(false);}return}
     if(d.dyr){const r=all[d.dyr];addEntry({n:r.n,k:r.k,p:r.p,rid:r.id});dyq="";drawDy(true);toast("Eingetragen");return}
@@ -764,6 +785,489 @@ document.addEventListener("change",ev=>{if(ev.target.id==="dg-k"||ev.target.id==
 /* ---------- Start ---------- */
 if(window.FB) startSync(); else window.addEventListener("fb",startSync);
 if(!HH) setTimeout(openHh,400);
+
+/* ---------- Plan mit Gekocht-Status ---------- */
+planHtml=function(){
+  const dn=ST.done||(ST.done={}); Object.keys(dn).forEach(k=>{if(!ST.sel[k])delete dn[k];});
+  const ids=Object.keys(ST.sel);
+  if(!ids.length) return '<p class="empty">Noch nichts im Plan. Tippe bei den Rezepten auf das Plus, zum Beispiel für zwei Gerichte über zwei Tage. Daraus entsteht deine Einkaufsliste.</p>';
+  const n=ids.reduce((a,i)=>a+ST.sel[i],0), nd=ids.filter(i=>dn[i]).length;
+  return `<div class="sum"><b>${n}× kochen</b> aus ${ids.length} Rezept${ids.length>1?"en":""}${nd?`, davon <b>${nd} gegessen</b>`:""}. Mengen gelten für 2 Personen. Weiter zum <b>Einkauf</b> für die Liste.</div>`+
+   ids.map(id=>{const r=all[id],g=!!dn[id];return `<div class="prow${g?" gk":""}"><div class="nm"><span class="id">${r.id}</span> <b>${esc(r.n)}</b><span class="meta">${metaOf(r)}</span></div>
+    <div class="step"><button data-dec="${id}" aria-label="Einmal weniger">−</button><span>${ST.sel[id]}×</span><button data-inc="${id}" aria-label="Einmal mehr">+</button></div>
+    <div class="acts"><button class="btn${g?"":" pri"}" data-open="${id}">Kochen</button><button class="btn" data-gk="${id}" aria-pressed="${g}">${g?"Gegessen ✓":"Als gegessen markieren"}</button></div></div>`}).join("")+
+   (nd?`<button class="btn" id="clrdone" style="width:100%;margin-top:6px">Erledigte entfernen (${nd})</button>`:"")+
+   `<button class="btn warn" id="clr" style="width:100%;margin-top:8px">Plan leeren</button>`;
+};
+
+// Nährwert-Tabelle (pro 100 g bzw. 100 ml): k = kcal, p = Eiweiß g; u = Einheiten [Name, g/ml], erste = Standard
+const FOODDB=[
+{n:"Kaffee, schwarz",a:["kaffee","schwarzer kaffee","filterkaffee","espresso"],k:1,p:0.1,u:[["Tasse",200],["Becher",300],["ml",1],["g",1]]},
+{n:"Kaffee mit Milch",a:["kaffee mit milch","milchkaffee","kaffee milch"],k:20,p:1.2,u:[["Tasse",200],["Becher",300],["ml",1],["g",1]]},
+{n:"Cappuccino",a:["cappuccino","capuccino","cappucino"],k:35,p:2.0,u:[["Tasse",180],["Becher",250],["ml",1],["g",1]]},
+{n:"Latte Macchiato",a:["latte macchiato","latte","milchkaffee groß"],k:50,p:2.6,u:[["Glas",300],["Becher",400],["ml",1],["g",1]]},
+{n:"Tee, ungesüßt",a:["tee","schwarzer tee","grüner tee","kräutertee","früchtetee","tee ungesüßt"],k:1,p:0,u:[["Tasse",200],["Becher",300],["ml",1],["g",1]]},
+{n:"Eistee",a:["eistee","ice tea","icetea","eistee gesüßt"],k:20,p:0,u:[["Glas",250],["Flasche",500],["ml",1],["g",1]]},
+{n:"Cola",a:["cola","coca cola","coke","pepsi"],k:42,p:0,u:[["Glas",250],["Dose",330],["Flasche",500],["ml",1],["g",1]]},
+{n:"Cola Zero",a:["cola zero","cola light","coke zero","zero cola","pepsi max","diet coke"],k:0,p:0,u:[["Glas",250],["Dose",330],["Flasche",500],["ml",1],["g",1]]},
+{n:"Fanta / Limonade",a:["fanta","limo","limonade","sprite","orangenlimonade","spezi","mezzomix"],k:40,p:0,u:[["Glas",250],["Dose",330],["Flasche",500],["ml",1],["g",1]]},
+{n:"Apfelschorle",a:["apfelschorle","schorle","apfelsaftschorle"],k:22,p:0.1,u:[["Glas",250],["Flasche",500],["ml",1],["g",1]]},
+{n:"Orangensaft",a:["orangensaft","o-saft","osaft","orangen saft"],k:44,p:0.7,u:[["Glas",200],["Flasche",330],["ml",1],["g",1]]},
+{n:"Apfelsaft",a:["apfelsaft","apfel saft"],k:46,p:0.1,u:[["Glas",200],["Flasche",330],["ml",1],["g",1]]},
+{n:"Multivitaminsaft",a:["multivitaminsaft","multivitamin","multivitamin saft","fruchtsaft"],k:46,p:0.4,u:[["Glas",200],["ml",1],["g",1]]},
+{n:"Bier (Pils)",a:["bier","pils","pilsner","helles","weizen","weizenbier","export","lager"],k:43,p:0.4,u:[["Flasche",500],["Glas",300],["Dose",500],["ml",1],["g",1]]},
+{n:"Alkoholfreies Bier",a:["alkoholfreies bier","bier alkoholfrei","alkoholfrei bier","radler alkoholfrei"],k:25,p:0.3,u:[["Flasche",500],["Glas",300],["ml",1],["g",1]]},
+{n:"Radler / Shandy",a:["radler","alsterwasser","shandy","biermischgetränk"],k:35,p:0.2,u:[["Flasche",500],["Glas",300],["Dose",500],["ml",1],["g",1]]},
+{n:"Wein (rot/weiß)",a:["wein","rotwein","weißwein","weisswein","rosé","rose","wein rot","wein weiß"],k:72,p:0.1,u:[["Glas",150],["Flasche",750],["ml",1],["g",1]]},
+{n:"Weinschorle",a:["weinschorle","weißweinschorle","weisweinschorle","rotweinschorle","spritzer"],k:38,p:0.1,u:[["Glas",250],["Flasche",500],["ml",1],["g",1]]},
+{n:"Sekt / Prosecco",a:["sekt","prosecco","champagner","secco"],k:75,p:0.2,u:[["Glas",100],["Flasche",750],["ml",1],["g",1]]},
+{n:"Spirituosen (40 %)",a:["schnaps","vodka","wodka","whisky","whiskey","gin","rum","korn","jägermeister","likör","kurzer"],k:230,p:0,u:[["Shot",20],["Glas",40],["ml",1],["g",1]]},
+{n:"Aperol Spritz",a:["aperol spritz","aperol","spritz"],k:80,p:0.1,u:[["Glas",200],["ml",1],["g",1]]},
+{n:"Gin Tonic / Longdrink",a:["gin tonic","longdrink","wodka energy","cuba libre","moscow mule"],k:75,p:0,u:[["Glas",250],["ml",1],["g",1]]},
+{n:"Energy Drink",a:["energy drink","energy","red bull","redbull","monster","energydrink"],k:45,p:0.4,u:[["Dose",250],["Dose groß",500],["ml",1],["g",1]]},
+{n:"Energy Drink zuckerfrei",a:["energy drink zero","energy zero","red bull zero","redbull sugarfree","monster zero","energy zuckerfrei","energy drink zuckerfrei"],k:3,p:0,u:[["Dose",250],["Dose groß",500],["ml",1],["g",1]]},
+{n:"Milch 1,5 %",a:["milch","milch 1,5","fettarme milch","h-milch","kuhmilch","milch 1.5"],k:47,p:3.4,u:[["Glas",200],["Schuss",50],["ml",1],["g",1]]},
+{n:"Vollmilch 3,5 %",a:["vollmilch","milch 3,5","milch 3.5","vollmilch 3,5"],k:65,p:3.4,u:[["Glas",200],["Schuss",50],["ml",1],["g",1]]},
+{n:"Haferdrink",a:["haferdrink","hafermilch","oatly","haferdrink barista","haferdrink natur"],k:46,p:1.0,u:[["Glas",200],["Schuss",50],["ml",1],["g",1]]},
+{n:"Sojadrink",a:["sojadrink","sojamilch","soja milch","soja drink"],k:40,p:3.3,u:[["Glas",200],["Schuss",50],["ml",1],["g",1]]},
+{n:"Mandeldrink",a:["mandeldrink","mandelmilch","mandel drink"],k:24,p:0.5,u:[["Glas",200],["Schuss",50],["ml",1],["g",1]]},
+{n:"Kakao (mit Milch)",a:["kakao","kakaogetränk","trinkschokolade","kakao milch","schokomilch","caprisonne"],k:75,p:3.4,u:[["Tasse",200],["Glas",250],["ml",1],["g",1]]},
+{n:"Wasser",a:["wasser","mineralwasser","sprudel","leitungswasser","wasser still","sprudelwasser"],k:0,p:0,u:[["Glas",250],["Flasche",500],["Flasche groß",1000],["ml",1],["g",1]]},
+{n:"Proteinshake (mit Wasser)",a:["proteinshake","protein shake","shake","eiweißshake","eiweiss shake","proteinshake wasser"],k:110,p:22.0,u:[["Shake",300],["Shaker",400],["ml",1],["g",1]]},
+{n:"Proteinshake (mit Milch)",a:["proteinshake milch","proteinshake mit milch","shake milch","eiweißshake milch"],k:90,p:11.5,u:[["Shake",300],["Shaker",400],["ml",1],["g",1]]},
+{n:"Brötchen",a:["brötchen","broetchen","semmel","weckle","schrippe","weißbrötchen","weissbrötchen","wasserbrötchen"],k:270,p:9.0,u:[["Stück",60],["g",1]]},
+{n:"Vollkornbrötchen",a:["vollkornbrötchen","vollkornbroetchen","körnerbrötchen","kornbrötchen","körnerbroetchen"],k:250,p:10.0,u:[["Stück",70],["g",1]]},
+{n:"Mischbrot",a:["brot","mischbrot","graubrot","bauernbrot","weißbrot","weissbrot","brotscheibe","scheibe brot"],k:245,p:7.5,u:[["Scheibe",50],["g",1]]},
+{n:"Vollkornbrot",a:["vollkornbrot","vollkorn brot","schwarzbrot","körnerbrot","roggenbrot","pumpernickel"],k:225,p:7.5,u:[["Scheibe",50],["g",1]]},
+{n:"Toast (Weizen)",a:["toast","toastbrot","toastscheibe","weizentoast","sandwichtoast"],k:265,p:8.0,u:[["Scheibe",25],["g",1]]},
+{n:"Vollkorntoast",a:["vollkorntoast","vollkorn toast","vollkorntoastbrot"],k:245,p:9.0,u:[["Scheibe",28],["g",1]]},
+{n:"Butter",a:["butter","kerrygold","markenbutter"],k:741,p:0.7,u:[["Portion",10],["TL",5],["EL",15],["g",1]]},
+{n:"Margarine",a:["margarine","becel","rama","halbfettmargarine","streichfett"],k:530,p:0.2,u:[["Portion",10],["TL",5],["EL",15],["g",1]]},
+{n:"Marmelade",a:["marmelade","konfitüre","konfituere","erdbeermarmelade","jam","gelee","fruchtaufstrich"],k:250,p:0.4,u:[["Portion",20],["TL",10],["EL",25],["g",1]]},
+{n:"Nutella / Nuss-Nougat-Creme",a:["nutella","nusscreme","nuss-nougat-creme","nougatcreme","schokocreme","nuss nougat creme"],k:540,p:6.0,u:[["Portion",20],["TL",10],["EL",20],["g",1]]},
+{n:"Honig",a:["honig","blütenhonig","bienenhonig"],k:310,p:0.4,u:[["TL",10],["EL",25],["Portion",20],["g",1]]},
+{n:"Erdnussbutter",a:["erdnussbutter","erdnussmus","peanutbutter","peanut butter","erdnusscreme"],k:600,p:25.0,u:[["EL",15],["TL",8],["Portion",20],["g",1]]},
+{n:"Käse, Scheibe (Gouda/Emmentaler)",a:["käse","kaese","käsescheibe","scheibenkäse","gouda","edamer","emmentaler","schnittkäse","käse scheibe","tilsiter"],k:355,p:25.0,u:[["Scheibe",25],["g",1]]},
+{n:"Käse light (Scheibe)",a:["käse light","light käse","fettarmer käse","käse 30%","leichter käse"],k:240,p:30.0,u:[["Scheibe",25],["g",1]]},
+{n:"Frischkäse",a:["frischkäse","frischkaese","philadelphia","doppelrahmfrischkäse","frischkäse natur"],k:250,p:6.0,u:[["EL",20],["Portion",30],["g",1]]},
+{n:"Frischkäse light",a:["frischkäse light","philadelphia light","frischkäse fettarm","körniger frischkäse light"],k:110,p:10.0,u:[["EL",20],["Portion",30],["g",1]]},
+{n:"Camembert / Brie",a:["camembert","brie","weichkäse","rotkäppchen"],k:300,p:20.0,u:[["Stück",30],["Ecke",60],["g",1]]},
+{n:"Salami",a:["salami","salamischeibe","salami scheibe","peperoniwurst","edelsalami"],k:420,p:20.0,u:[["Scheibe",5],["Portion",20],["g",1]]},
+{n:"Kochschinken",a:["schinken","kochschinken","hinterschinken","formfleischschinken","schinkenscheibe"],k:110,p:19.0,u:[["Scheibe",20],["g",1]]},
+{n:"Rohschinken",a:["rohschinken","parmaschinken","serrano","schwarzwälder schinken","prosciutto","lachsschinken"],k:230,p:27.0,u:[["Scheibe",15],["g",1]]},
+{n:"Putenbrust-Aufschnitt",a:["putenbrust","putenbrust aufschnitt","puten aufschnitt","putenaufschnitt","geflügelwurst","hähnchenbrust aufschnitt","putenschinken"],k:95,p:20.0,u:[["Scheibe",15],["Portion",40],["g",1]]},
+{n:"Leberwurst",a:["leberwurst","streichwurst","teewurst","mettwurst","schmierwurst"],k:320,p:12.0,u:[["Portion",20],["EL",20],["g",1]]},
+{n:"Ei, gekocht",a:["ei","eier","gekochtes ei","frühstücksei","hühnerei","hartgekochtes ei","ei gekocht","spiegelei"],k:140,p:12.5,u:[["Stück",55],["g",1]]},
+{n:"Rührei",a:["rührei","ruehrei","rührei mit milch","omelett","omelette"],k:160,p:11.0,u:[["Portion",120],["Ei",70],["g",1]]},
+{n:"Spiegelei (gebraten)",a:["spiegelei gebraten","bratei","setzei"],k:190,p:13.0,u:[["Stück",60],["g",1]]},
+{n:"Müsli",a:["müsli","muesli","knuspermüsli","früchtemüsli","schokomüsli","granola","knusper müsli"],k:380,p:10.0,u:[["Schüssel",60],["EL",10],["Portion",50],["g",1]]},
+{n:"Cornflakes",a:["cornflakes","corn flakes","frühstücksflocken","frosties","choco crossies","cerealien","cheerios"],k:375,p:7.0,u:[["Schüssel",40],["Portion",30],["g",1]]},
+{n:"Haferflocken",a:["haferflocken","kölln","porridge flocken","zarte haferflocken","kernige haferflocken","haferflocken trocken"],k:370,p:13.5,u:[["Portion",50],["EL",10],["g",1]]},
+{n:"Porridge (mit Milch)",a:["porridge","haferbrei","oatmeal","overnight oats"],k:110,p:4.5,u:[["Schüssel",300],["Portion",250],["g",1]]},
+{n:"Joghurt, Frucht",a:["fruchtjoghurt","joghurt frucht","joghurt erdbeere","joghurt mit frucht","fruchtquark"],k:95,p:3.5,u:[["Becher",150],["g",1]]},
+{n:"Naturjoghurt 3,5 %",a:["naturjoghurt","joghurt","joghurt natur","naturjoghurt 3,5","vollmilchjoghurt","jogurt"],k:65,p:3.8,u:[["Becher",150],["EL",20],["g",1]]},
+{n:"Naturjoghurt 1,5 %",a:["naturjoghurt fettarm","joghurt 1,5","joghurt fettarm","joghurt light","joghurt 0,1","magerjoghurt"],k:45,p:4.3,u:[["Becher",150],["EL",20],["g",1]]},
+{n:"Griechischer Joghurt",a:["griechischer joghurt","joghurt griechisch","griechisches joghurt","joghurt 10%","fage"],k:130,p:5.5,u:[["Becher",150],["EL",20],["g",1]]},
+{n:"Skyr",a:["skyr","skyr natur","isländischer joghurt","skyr natur 0,2"],k:63,p:11.0,u:[["Becher",150],["Packung",450],["g",1]]},
+{n:"Proteinjoghurt / High Protein Pudding",a:["proteinjoghurt","high protein joghurt","protein pudding","ehrmann high protein","high protein pudding","proteinpudding","milchreis protein"],k:75,p:10.0,u:[["Becher",200],["g",1]]},
+{n:"Quark 20 % (Speisequark)",a:["quark","speisequark","quark 20","magerquark 20","quark halbfett","quark 20%"],k:105,p:11.0,u:[["EL",25],["Becher",250],["g",1]]},
+{n:"Magerquark",a:["magerquark","quark mager","quark 0,2","mager quark","quark 0,2%"],k:67,p:12.0,u:[["EL",25],["Becher",250],["Portion",150],["g",1]]},
+{n:"Hüttenkäse",a:["hüttenkäse","huettenkaese","cottage cheese","körniger frischkäse","hüttenkäse natur"],k:95,p:12.5,u:[["Becher",200],["Portion",100],["EL",25],["g",1]]},
+{n:"Sahne",a:["sahne","schlagsahne","schlagobers","kochsahne","cremefine","sahne 30%"],k:300,p:2.3,u:[["EL",15],["Schuss",50],["Becher",200],["ml",1],["g",1]]},
+{n:"Milchreis",a:["milchreis","milchreis fertig","reispudding","milchreis natur"],k:115,p:3.2,u:[["Becher",200],["Portion",250],["g",1]]},
+{n:"Pudding",a:["pudding","vanillepudding","schokopudding","dr. oetker pudding","grießbrei","grießpudding"],k:110,p:3.2,u:[["Becher",125],["Portion",150],["g",1]]},
+{n:"Pommes frites",a:["pommes","pommes frites","fritten","fritt","pommes rot weiß","french fries","pommes schranke","kartoffelstäbchen","pommes airfryer"],k:290,p:3.5,u:[["Portion",150],["Schale",200],["Kleine Portion",100],["g",1]]},
+{n:"Currywurst mit Soße",a:["currywurst","currywurst soße","currywurst mit brötchen","currywurst sosse"],k:200,p:8.0,u:[["Portion",250],["g",1]]},
+{n:"Bratwurst",a:["bratwurst","grillwurst","thüringer","thüringer rostbratwurst","rostbratwurst","nürnberger","bratwürste","bratwürstchen"],k:300,p:13.0,u:[["Stück",120],["Nürnberger",25],["g",1]]},
+{n:"Bratwurst im Brötchen",a:["bratwurstbrötchen","bratwurst im brötchen","bratwurst brötchen","wurst im brötchen"],k:270,p:11.0,u:[["Stück",180],["g",1]]},
+{n:"Wiener / Würstchen",a:["wiener","wiener würstchen","würstchen","wuerstchen","frankfurter","bockwurst","knacker","saitenwürstchen","würstchen heiß"],k:270,p:11.5,u:[["Stück",50],["Bockwurst",100],["g",1]]},
+{n:"Schnitzel, paniert",a:["schnitzel","wiener schnitzel","schweineschnitzel","paniertes schnitzel","jägerschnitzel","schnitzel paniert","putenschnitzel paniert","hähnchenschnitzel paniert"],k:230,p:17.0,u:[["Stück",150],["Portion",200],["g",1]]},
+{n:"Döner Kebab",a:["döner","doener","döner kebab","kebab","dönertasche","döner im brot","hähnchendöner","kebap","döner kebap"],k:210,p:11.0,u:[["Stück",400],["Kleiner Döner",300],["g",1]]},
+{n:"Dürüm",a:["dürüm","dürüm döner","duerum","dürüm kebab","wrap döner","dürüm hähnchen"],k:210,p:11.5,u:[["Stück",400],["g",1]]},
+{n:"Döner-Teller",a:["dönerteller","döner teller","dönerteller mit pommes","döner mit reis","dönerfleisch"],k:190,p:10.0,u:[["Teller",500],["g",1]]},
+{n:"Falafel (gebraten)",a:["falafel","falafelbällchen","falafel bällchen","falafel teller"],k:330,p:13.0,u:[["Stück",25],["Portion",125],["g",1]]},
+{n:"Pizza Margherita",a:["pizza","pizza margherita","margherita","steinofenpizza","pizza ganz","pizza salami","pizza schinken","pizza funghi","pizza tonno"],k:240,p:10.5,u:[["Pizza",350],["Tiefkühlpizza",320],["g",1]]},
+{n:"Pizzastück",a:["pizzastück","stück pizza","pizza stück","pizzaschnitte","pizzastueck","stück pizza margherita"],k:250,p:11.0,u:[["Stück",120],["g",1]]},
+{n:"Flammkuchen",a:["flammkuchen","elsässer flammkuchen","tarte flambée"],k:260,p:9.0,u:[["Stück",300],["Portion",150],["g",1]]},
+{n:"Hamburger",a:["hamburger","burger","rindburger","bigmac","big mac","burger klassisch","mcdonalds burger","whopper"],k:250,p:13.0,u:[["Stück",220],["Hamburger klein",110],["g",1]]},
+{n:"Cheeseburger",a:["cheeseburger","cheese burger","doppel cheeseburger","mcdouble","burger mit käse","cheeseburger klein"],k:265,p:14.0,u:[["Stück",120],["Großer",250],["g",1]]},
+{n:"Chicken Nuggets",a:["nuggets","chicken nuggets","chickennuggets","mcnuggets","hähnchennuggets","nugget"],k:250,p:16.0,u:[["Stück",18],["6er Box",108],["9er Box",162],["g",1]]},
+{n:"Crispy Chicken Burger",a:["chicken burger","crispy chicken","chickenburger","hähnchenburger","mcchicken","hühnchenburger"],k:260,p:12.0,u:[["Stück",200],["g",1]]},
+{n:"Nudeln mit Bolognese",a:["nudeln bolognese","spaghetti bolognese","bolognese","spaghetti mit hackfleischsoße","nudeln mit hackfleischsoße","spag bol","pasta bolognese","hackfleischsoße nudeln"],k:150,p:8.0,u:[["Teller",400],["Portion",350],["g",1]]},
+{n:"Spaghetti Carbonara",a:["carbonara","spaghetti carbonara","nudeln carbonara","pasta carbonara","spaghetti sahnesoße schinken"],k:195,p:8.0,u:[["Teller",400],["Portion",350],["g",1]]},
+{n:"Nudeln mit Tomatensoße",a:["nudeln tomatensoße","spaghetti tomatensoße","pasta pomodoro","nudeln mit tomatensoße","spaghetti napoli","nudeln mit soße","pasta tomatensauce"],k:115,p:4.0,u:[["Teller",400],["Portion",350],["g",1]]},
+{n:"Lasagne",a:["lasagne","lasagna","lasagne bolognese","lasagne al forno"],k:160,p:8.0,u:[["Portion",400],["Stück",300],["g",1]]},
+{n:"Käsespätzle",a:["käsespätzle","kaesespaetzle","kässpätzle","spätzle mit käse","kasspatzen"],k:210,p:9.5,u:[["Portion",400],["Teller",450],["g",1]]},
+{n:"Spätzle, gekocht",a:["spätzle","spaetzle","eierspätzle","knöpfle","spätzle gekocht"],k:155,p:6.0,u:[["Portion",200],["Beilage",150],["g",1]]},
+{n:"Maultaschen",a:["maultaschen","maultasche","schwäbische maultaschen","maultaschen in brühe"],k:175,p:7.0,u:[["Stück",70],["Portion",250],["g",1]]},
+{n:"Kartoffelsalat",a:["kartoffelsalat","kartoffelsalat mit mayo","kartoffel salat","schwäbischer kartoffelsalat"],k:150,p:2.0,u:[["Portion",200],["Beilage",150],["g",1]]},
+{n:"Nudelsalat",a:["nudelsalat","nudelsalat mit mayo","nudel salat","pastasalat","nudelsalat italienisch"],k:170,p:4.0,u:[["Portion",200],["Beilage",150],["g",1]]},
+{n:"Gulasch (Rind)",a:["gulasch","rindergulasch","gulaschsuppe","gulasch mit soße","pferdegulasch","gulasch rind"],k:130,p:11.0,u:[["Portion",250],["Teller",350],["g",1]]},
+{n:"Hähnchen-Curry",a:["curry","hähnchencurry","hühnchencurry","hähnchen curry","chicken curry","curry mit reis","currygericht"],k:125,p:9.0,u:[["Portion",350],["Teller",450],["g",1]]},
+{n:"Chili con Carne",a:["chili","chili con carne","chilli","chili con came","chili sin carne","chilli con carne"],k:115,p:8.0,u:[["Portion",350],["Teller",450],["g",1]]},
+{n:"Reis, gekocht",a:["reis","reis gekocht","basmati","basmatireis","jasminreis","langkornreis","parboiled reis","weißer reis","reis weiß","gekochter reis"],k:130,p:2.7,u:[["Portion",180],["Beilage",150],["Tasse",160],["g",1]]},
+{n:"Vollkornreis, gekocht",a:["vollkornreis","naturreis","brauner reis","reis vollkorn","vollkornreis gekocht"],k:125,p:2.7,u:[["Portion",180],["Beilage",150],["g",1]]},
+{n:"Salatbar-Teller",a:["salatbar","salatteller","salat teller","salatbar teller","gemischter salatteller","salat gemischt","bunter salat","salat kantine"],k:75,p:2.5,u:[["Teller",350],["Schale",250],["Kleiner Teller",200],["g",1]]},
+{n:"Gemüsesuppe",a:["suppe","gemüsesuppe","gemuesesuppe","kartoffelsuppe","tomatensuppe","kürbissuppe","nudelsuppe","hühnersuppe","brühe","suppe kantine"],k:40,p:1.8,u:[["Teller",300],["Tasse",250],["Schüssel",400],["g",1]]},
+{n:"Eintopf",a:["eintopf","linseneintopf","erbseneintopf","bohneneintopf","gemüseeintopf","kantinen eintopf","linsensuppe","erbsensuppe"],k:85,p:4.5,u:[["Teller",400],["Schüssel",500],["Tasse",250],["g",1]]},
+{n:"Frikadelle",a:["frikadelle","frikadellen","bulette","buletten","fleischpflanzerl","fleischküchle","hacksteak","fleischbällchen","hackbällchen"],k:240,p:16.0,u:[["Stück",90],["Große",120],["g",1]]},
+{n:"Leberkäse",a:["leberkäse","leberkaese","fleischkäse","fleischkaese","lyoner","leberkäs","leberkäse warm"],k:290,p:12.0,u:[["Scheibe",100],["Portion",150],["g",1]]},
+{n:"Leberkäsebrötchen",a:["leberkäsbrötchen","leberkäsebrötchen","leberkässemmel","leberkäse brötchen","leberkässemmel","fleischkäsebrötchen"],k:280,p:12.0,u:[["Stück",160],["g",1]]},
+{n:"Laugenbrezel",a:["brezel","brezen","laugenbrezel","breze","butterbrezel","laugenbrötchen","laugenstange","salzbrezel"],k:255,p:8.0,u:[["Stück",100],["Kleine",60],["Mini",30],["g",1]]},
+{n:"Croissant",a:["croissant","buttercroissant","hörnchen","butterhörnchen","croissants","schokocroissant"],k:405,p:8.0,u:[["Stück",60],["Großes",80],["g",1]]},
+{n:"Berliner / Krapfen",a:["berliner","krapfen","pfannkuchen berlin","berliner ballen","kreppel","faschingskrapfen","donut","donuts"],k:350,p:6.0,u:[["Stück",80],["g",1]]},
+{n:"Kuchenstück (Rührkuchen)",a:["kuchen","kuchenstück","stück kuchen","rührkuchen","marmorkuchen","sandkuchen","gugelhupf","zitronenkuchen","kuchen stück"],k:390,p:5.0,u:[["Stück",100],["Kleines Stück",70],["g",1]]},
+{n:"Obstkuchen / Obsttorte",a:["obstkuchen","obsttorte","apfelkuchen","erdbeerkuchen","obstboden","apfeltasche","apfelstrudel","streuselkuchen","käsekuchen"],k:230,p:4.0,u:[["Stück",130],["g",1]]},
+{n:"Sahnetorte",a:["torte","sahnetorte","buttercremetorte","schwarzwälder kirschtorte","schwarzwälder","stück torte","tortenstück","cremetorte"],k:300,p:4.0,u:[["Stück",120],["g",1]]},
+{n:"Eis, Kugel",a:["eis","eiskugel","kugel eis","speiseeis","eiscreme","vanilleeis","schokoeis","eis kugel","softeis"],k:200,p:3.5,u:[["Kugel",60],["Waffel",100],["Becher",120],["g",1]]},
+{n:"Proteinriegel",a:["proteinriegel","protein riegel","proteinbar","protein bar","eiweißriegel","barebells","quest bar","proteinriegel schoko","protein riegel schoko"],k:370,p:35.0,u:[["Riegel",55],["Riegel groß",60],["g",1]]},
+{n:"Müsliriegel",a:["müsliriegel","muesliriegel","getreideriegel","fruchtriegel","cerealienriegel","corny","nut riegel","energieriegel"],k:400,p:6.0,u:[["Riegel",25],["Riegel groß",35],["g",1]]},
+{n:"Schokolade, Vollmilch",a:["schokolade","vollmilchschokolade","milka","ritter sport","schokolade vollmilch","tafel schokolade","nussschokolade","schoko"],k:540,p:7.0,u:[["Rippe",5],["Reihe",20],["Tafel",100],["g",1]]},
+{n:"Zartbitterschokolade",a:["zartbitterschokolade","zartbitter","bitterschokolade","dunkle schokolade","schokolade zartbitter","edelbitter","schokolade 70%"],k:560,p:7.0,u:[["Rippe",5],["Reihe",20],["Tafel",100],["g",1]]},
+{n:"Schokoriegel",a:["schokoriegel","snickers","mars","twix","bounty","kitkat","kit kat","milky way","duplo","hanuta","knoppers","kinder riegel","kinderriegel","kinder bueno","raffaello"],k:480,p:6.5,u:[["Riegel",50],["Riegel klein",25],["g",1]]},
+{n:"Kinder Schokolade",a:["kinder schokolade","kinderschokolade","kinder","milchschnitte","kinder country"],k:565,p:8.0,u:[["Riegel",12.5],["Stück",12.5],["g",1]]},
+{n:"Gummibärchen / Fruchtgummi",a:["gummibärchen","gummibaerchen","haribo","fruchtgummi","gummibär","weingummi","gummibärchen haribo","saure gummi","lakritz","lakritze"],k:340,p:6.5,u:[["Handvoll",30],["Tüte",100],["Beutel klein",50],["g",1]]},
+{n:"Bonbons",a:["bonbon","bonbons","lutscher","hustenbonbon","kaugummi","pfefferminz","tictac","zuckerl"],k:390,p:0,u:[["Stück",5],["g",1]]},
+{n:"Chips",a:["chips","kartoffelchips","paprikachips","chipsletten","pringles","funny frisch","kartoffel chips","chips paprika"],k:535,p:6.0,u:[["Handvoll",30],["Portion",50],["Tüte",150],["Große Tüte",200],["g",1]]},
+{n:"Tortilla-Chips",a:["tortilla chips","nachos","doritos","tortillachips","tortilla chips mit dip"],k:490,p:7.0,u:[["Handvoll",30],["Portion",50],["Tüte",150],["g",1]]},
+{n:"Salzstangen",a:["salzstangen","salzgebäck","brezeln mini","salzbrezeln","partymix","cracker","erdnussflips","flips","chio","salzletten"],k:380,p:10.0,u:[["Handvoll",30],["Portion",50],["Stange",3],["g",1]]},
+{n:"Erdnüsse (geröstet, gesalzen)",a:["erdnüsse","erdnuesse","erdnuss","nüsse gesalzen","studentenfutter","erdnüsse gesalzen","cashews gesalzen","nussmix"],k:600,p:26.0,u:[["Handvoll",30],["Portion",25],["Tüte",100],["g",1]]},
+{n:"Mandeln",a:["mandeln","mandel","naturmandeln","mandelkerne","gehackte mandeln","gemahlene mandeln","mandeln natur"],k:600,p:21.0,u:[["Handvoll",30],["Stück",1.2],["g",1]]},
+{n:"Walnüsse",a:["walnüsse","walnuss","walnusskerne","walnuss kerne","nüsse","haselnüsse","haselnuss","cashews","cashewkerne","paranüsse","pistazien","pekannüsse"],k:700,p:15.0,u:[["Handvoll",30],["Nuss",5],["g",1]]},
+{n:"Kekse / Butterkeks",a:["kekse","keks","butterkeks","plätzchen","leibniz","vollkornkeks","schokokekse","oreo","kekse schoko","cookies","cookie","gebäck","waffeln"],k:450,p:6.0,u:[["Stück",8],["Portion",30],["Cookie",50],["g",1]]},
+{n:"Reiswaffel",a:["reiswaffel","reiswaffeln","reiskuchen","reiscracker","puffreis waffel","reiswaffel natur","maiswaffel","puffreiswaffel"],k:385,p:7.5,u:[["Stück",8],["g",1]]},
+{n:"Popcorn",a:["popcorn","popcorn süß","popcorn gesalzen","kinopopcorn","popcorn salzig","popcorn natur"],k:450,p:8.0,u:[["Portion",30],["Tüte",100],["Kino Eimer",150],["g",1]]},
+{n:"Apfel",a:["apfel","äpfel","aepfel","apfel mit schale"],k:55,p:0.3,u:[["Stück",180],["Kleiner",120],["g",1]]},
+{n:"Banane",a:["banane","bananen","banane geschält"],k:95,p:1.2,u:[["Stück",120],["Große",150],["g",1]]},
+{n:"Orange / Mandarine",a:["orange","orangen","mandarine","mandarinen","clementine","clementinen","satsuma","apfelsine","grapefruit"],k:45,p:1.0,u:[["Stück",150],["Mandarine",80],["g",1]]},
+{n:"Trauben",a:["trauben","weintrauben","traube","kernlose trauben","rote trauben","grüne trauben"],k:70,p:0.7,u:[["Handvoll",100],["Traube",5],["Portion",150],["g",1]]},
+{n:"Beeren (gemischt)",a:["beeren","blaubeeren","heidelbeeren","himbeeren","brombeeren","johannisbeeren","waldbeeren","beerenmix","heidelbeere","himbeere"],k:45,p:1.0,u:[["Handvoll",80],["Schale",125],["g",1]]},
+{n:"Erdbeeren",a:["erdbeeren","erdbeere","erdbeer"],k:32,p:0.7,u:[["Stück",15],["Schale",250],["Portion",150],["g",1]]},
+{n:"Birne",a:["birne","birnen","williams christ","nashi"],k:55,p:0.5,u:[["Stück",170],["g",1]]},
+{n:"Kiwi",a:["kiwi","kiwis","kiwi gold"],k:60,p:1.1,u:[["Stück",75],["g",1]]},
+{n:"Mango",a:["mango","mangos","mangostücke","mango frisch"],k:60,p:0.6,u:[["Stück",300],["Portion",150],["g",1]]},
+{n:"Ananas",a:["ananas","ananas frisch","ananasstücke","ananas dose","ananas stück"],k:55,p:0.5,u:[["Scheibe",80],["Portion",150],["g",1]]},
+{n:"Melone",a:["melone","wassermelone","honigmelone","zuckermelone","cantaloupe","galiamelone"],k:35,p:0.7,u:[["Stück",200],["Scheibe",300],["g",1]]},
+{n:"Pfirsich / Nektarine",a:["pfirsich","nektarine","pfirsiche","aprikose","aprikosen","pflaume","pflaumen","kirschen","kirsche","zwetschge","zwetschgen"],k:45,p:0.9,u:[["Stück",120],["Handvoll",80],["g",1]]},
+{n:"Trockenfrüchte",a:["trockenfrüchte","rosinen","datteln","dattel","trockenobst","getrocknete aprikosen","feigen","getrocknete feigen","cranberries"],k:300,p:2.5,u:[["Handvoll",30],["Dattel",8],["g",1]]},
+{n:"Avocado",a:["avocado","avocados","avokado","avo","guacamole"],k:160,p:2.0,u:[["Stück",150],["Hälfte",75],["g",1]]},
+{n:"Gurke",a:["gurke","gurken","salatgurke","gurkenscheiben","mini gurke","minigurke","cornichons","salzgurke","essiggurke"],k:12,p:0.6,u:[["Stück",300],["Scheibe",5],["Mini",80],["g",1]]},
+{n:"Tomate",a:["tomate","tomaten","cherrytomaten","kirschtomaten","cocktailtomaten","rispentomate","datteltomaten","strauchtomaten"],k:18,p:0.9,u:[["Stück",100],["Cherry",15],["Handvoll",80],["g",1]]},
+{n:"Paprika",a:["paprika","paprikaschote","rote paprika","gelbe paprika","spitzpaprika","paprika roh","paprikaschoten"],k:30,p:1.1,u:[["Stück",160],["Spitzpaprika",80],["g",1]]},
+{n:"Karotte / Möhre",a:["karotte","karotten","möhre","möhren","mohrrübe","gelbe rübe","rüblis","karotte roh","möhrensalat","rohkost","baby karotten"],k:35,p:0.9,u:[["Stück",80],["Große",120],["g",1]]},
+{n:"Eisbergsalat / Blattsalat",a:["salat","eisbergsalat","kopfsalat","blattsalat","feldsalat","rucola","römersalat","lollo rosso","grüner salat","salatblätter","babyspinat"],k:15,p:1.2,u:[["Portion",80],["Handvoll",30],["Teller",100],["g",1]]},
+{n:"Salat mit Dressing",a:["salat mit dressing","gemischter salat","beilagensalat","salat dressing","salat mit joghurtdressing","beilagensalat mit dressing","caesar salad","caesar salat"],k:70,p:2.0,u:[["Portion",150],["Schüssel",250],["Beilage",100],["g",1]]},
+{n:"Radieschen / Kohlrabi",a:["radieschen","kohlrabi","rettich","sellerie","staudensellerie","fenchel","rote bete","rote beete"],k:20,p:1.2,u:[["Stück",80],["Handvoll",50],["Portion",100],["g",1]]},
+{n:"Hähnchenbrust, gegart",a:["hähnchenbrust","haehnchenbrust","hühnerbrust","hähnchenbrustfilet","chicken breast","hähnchen","hühnchen","hähnchen gebraten","hähnchenbrust gebraten","hähnchenbrust gegrillt","hähnchenfilet","hühnchenbrust","hähnchengeschnetzeltes","hähnchenbrust airfryer"],k:165,p:31.0,u:[["Stück",150],["Portion",200],["Streifen",30],["g",1]]},
+{n:"Hähnchenschenkel (mit Haut, gegart)",a:["hähnchenschenkel","hähnchenkeule","hühnerkeule","hähnchen keule","chicken thigh","hähnchenunterschenkel","hähnchen drumstick","backhendl","grillhähnchen","hähnchenschenkel airfryer","hendl"],k:215,p:24.0,u:[["Stück",150],["Unterschenkel",100],["g",1]]},
+{n:"Hähnchenschenkel (ohne Haut)",a:["hähnchenschenkel ohne haut","hähnchenschenkel ohne","hähnchenoberschenkelfilet","hähnchen oberschenkel","oberschenkelfilet"],k:175,p:26.0,u:[["Stück",120],["g",1]]},
+{n:"Rinderhack, gebraten",a:["rinderhack","hackfleisch","hack","rinderhackfleisch","hackfleisch gebraten","gehacktes","hack gebraten","hackfleisch rind","faschiertes","hackfleisch gemischt"],k:240,p:26.0,u:[["Portion",150],["EL",20],["g",1]]},
+{n:"Rindersteak (gebraten)",a:["rindersteak","steak","rumpsteak","rib eye","entrecote","hüftsteak","rinderfilet","filetsteak","roastbeef","rinderfilet gebraten","rind steak"],k:190,p:30.0,u:[["Stück",200],["Kleines Steak",150],["g",1]]},
+{n:"Rinderbraten / Rouladen",a:["rinderbraten","rinderroulade","rouladen","sauerbraten","schmorbraten","rindfleisch","tafelspitz","braten","rinderbrust","gulaschfleisch"],k:190,p:30.0,u:[["Portion",180],["Scheibe",80],["g",1]]},
+{n:"Putenschnitzel (roh/natur)",a:["putenschnitzel","putenbrustfilet","putensteak","pute","putenfleisch","putengeschnetzeltes","puten schnitzel","putenbrust natur","pute gebraten","putenbrust gebraten"],k:150,p:30.0,u:[["Stück",150],["Portion",180],["g",1]]},
+{n:"Schweinefilet",a:["schweinefilet","schweinefleisch","schweinesteak","schweinelachs","kotelett","schweinekotelett","nacken","schweinenacken","schweinebraten","schweinegeschnetzeltes"],k:160,p:28.0,u:[["Stück",150],["Portion",200],["Scheibe",50],["g",1]]},
+{n:"Bacon / Speck",a:["bacon","speck","frühstücksspeck","bauchspeck","schinkenspeck","speckwürfel","baconstreifen","bacon knusprig","bacon scheibe","knuspriger bacon"],k:420,p:15.0,u:[["Scheibe",10],["Portion",30],["EL Würfel",15],["g",1]]},
+{n:"Halloumi",a:["halloumi","grillkäse","haloumi","grillkäse halloumi","bratkäse"],k:320,p:22.0,u:[["Scheibe",40],["Packung",200],["Portion",80],["g",1]]},
+{n:"Mozzarella",a:["mozzarella","mozarella","mozzarella kugel","büffelmozzarella","mozzarella light","pizzakäse","gerieben käse","gouda gerieben","reibekäse","gratinkäse","streukäse"],k:240,p:18.0,u:[["Kugel",125],["Portion",60],["Handvoll",30],["g",1]]},
+{n:"Feta / Schafskäse",a:["feta","schafskäse","schafkäse","hirtenkäse","salakis","balkankäse","feta käse","fetakäse","ziegenkäse"],k:265,p:17.0,u:[["Portion",50],["Würfel",25],["Packung",180],["g",1]]},
+{n:"Parmesan",a:["parmesan","grana padano","parmigiano","hartkäse","bergkäse","parmesan gerieben","pecorino"],k:400,p:35.0,u:[["EL",8],["Portion",15],["Stück",30],["g",1]]},
+{n:"Tofu",a:["tofu","tofu natur","räuchertofu","bio tofu","tofu gebraten","seidentofu","tofu geräuchert"],k:125,p:13.0,u:[["Portion",100],["Packung",200],["Scheibe",40],["g",1]]},
+{n:"Tempeh / Seitan",a:["tempeh","seitan","veganes hack","soja hack","sojageschnetzeltes","fleischersatz","vegane wurst","veggie burger","veggie bratwurst","vegane bratwurst"],k:190,p:20.0,u:[["Portion",100],["Stück",80],["g",1]]},
+{n:"Linsen, gekocht",a:["linsen","linsen gekocht","rote linsen","tellerlinsen","berglinsen","grüne linsen","linsengericht","rote linsen gekocht","linsen dose"],k:115,p:9.0,u:[["Portion",150],["EL",20],["Dose",250],["g",1]]},
+{n:"Kidneybohnen",a:["kidneybohnen","kidney bohnen","rote bohnen","bohnen","weiße bohnen","weisse bohnen","kidneybohnen dose","schwarze bohnen","bohnen dose","baked beans","kidney"],k:105,p:7.5,u:[["Portion",120],["EL",20],["Dose",250],["g",1]]},
+{n:"Kichererbsen",a:["kichererbsen","kichererbsen dose","kichererbsen gekocht","chickpeas","kichererbse"],k:130,p:7.5,u:[["Portion",120],["EL",20],["Dose",240],["g",1]]},
+{n:"Hummus",a:["hummus","humus","hummus natur","kichererbsenmus","houmous","dip hummus"],k:290,p:7.0,u:[["EL",25],["Portion",50],["Packung",200],["g",1]]},
+{n:"Erbsen / Mais (Gemüse)",a:["erbsen","mais","maiskörner","mais dose","erbsen tk","grüne erbsen","gemüsemais","edamame","zuckermais","maiskolben"],k:80,p:5.0,u:[["Portion",100],["EL",20],["Dose",140],["g",1]]},
+{n:"Whey-Protein Pulver",a:["whey","whey protein","proteinpulver","protein pulver","eiweißpulver","eiweiss pulver","whey pulver","casein","proteinpulver whey","protein shake pulver","esn","myprotein","scoop","scoop protein"],k:385,p:78.0,u:[["Scoop",30],["Portion",30],["Löffel",30],["g",1]]},
+{n:"Kartoffeln, gekocht",a:["kartoffeln","kartoffel","salzkartoffeln","pellkartoffeln","gekochte kartoffeln","kartoffeln gekocht","petersilienkartoffeln","ofenkartoffel","backkartoffel","kartoffeln airfryer"],k:70,p:2.0,u:[["Stück",90],["Portion",250],["Beilage",200],["g",1]]},
+{n:"Bratkartoffeln",a:["bratkartoffeln","bratkartoffel","röstkartoffeln","rösti","kartoffelpfanne","bauernfrühstück","reibekuchen","kartoffelpuffer","kartoffelecken","country potatoes","kartoffelspalten","wedges"],k:150,p:2.5,u:[["Portion",250],["Beilage",200],["Teller",350],["g",1]]},
+{n:"Kartoffelpüree",a:["kartoffelpüree","kartoffelbrei","püree","stampfkartoffeln","kartoffelpuere","kartoffelstampf","kartoffelpüree fertig"],k:95,p:2.0,u:[["Portion",200],["Beilage",150],["g",1]]},
+{n:"Kroketten",a:["kroketten","kartoffelkroketten","krokette","kartoffeltaschen","kartoffelbällchen","kroketten ofen","kroketten fritiert"],k:200,p:3.0,u:[["Stück",25],["Portion",150],["g",1]]},
+{n:"Süßkartoffel",a:["süßkartoffel","süsskartoffel","suesskartoffel","süßkartoffeln","süßkartoffel gebacken","süßkartoffel gekocht","süßkartoffelpommes","sweet potato","süßkartoffel airfryer"],k:90,p:1.6,u:[["Stück",250],["Portion",200],["g",1]]},
+{n:"Nudeln, gekocht",a:["nudeln","pasta","spaghetti","penne","fusilli","makkaroni","tagliatelle","farfalle","spiralnudeln","bandnudeln","nudeln gekocht","spaghetti gekocht","vollkornnudeln","rigatoni","eiernudeln"],k:150,p:5.5,u:[["Portion",250],["Teller",300],["Beilage",180],["g",1]]},
+{n:"Nudeln, trocken",a:["nudeln trocken","pasta trocken","spaghetti trocken","nudeln roh","nudeln ungekocht","nudeln ungekocht trocken","trockene nudeln","spaghetti roh"],k:355,p:12.5,u:[["Portion",100],["Handvoll",70],["g",1]]},
+{n:"Couscous (gekocht)",a:["couscous","couscous gekocht","bulgur","bulgur gekocht","quinoa","quinoa gekocht","hirse","hirse gekocht","taboulé","tabouleh"],k:125,p:4.5,u:[["Portion",180],["Beilage",150],["g",1]]},
+{n:"Brokkoli",a:["brokkoli","broccoli","brokkoli gekocht","blumenkohl","romanesco","brokkoli roh","brokkoli dampf","brokkoliröschen","röschen"],k:30,p:3.0,u:[["Portion",200],["Röschen",25],["Beilage",150],["g",1]]},
+{n:"Zucchini",a:["zucchini","zucchinis","zucchini gebraten","zucchini roh","zucchini gekocht","aubergine","auberginen","zuchini"],k:20,p:1.6,u:[["Stück",250],["Portion",150],["Scheibe",20],["g",1]]},
+{n:"Gemüsepfanne",a:["gemüsepfanne","gemuesepfanne","pfannengemüse","ofengemüse","wokgemüse","gemüse","gemüse gebraten","gemüsemix","gemüse tk","gemüse gegart","gemüsebeilage"],k:70,p:2.5,u:[["Portion",250],["Beilage",200],["Teller",350],["g",1]]},
+{n:"Spinat (gegart)",a:["spinat","rahmspinat","blattspinat","spinat tk","spinat gegart","mangold","grünkohl","wirsing","kohl","rotkohl","weißkohl","blaukraut","sauerkraut","rosenkohl"],k:35,p:3.0,u:[["Portion",200],["Beilage",150],["g",1]]},
+{n:"Pilze / Champignons",a:["pilze","champignons","champignon","pilzpfanne","pfifferlinge","steinpilze","austernpilze","pilze gebraten","champignons gebraten"],k:25,p:3.0,u:[["Portion",150],["Stück",20],["Handvoll",50],["g",1]]},
+{n:"Olivenöl",a:["olivenöl","oliven öl","öl","pflanzenöl","rapsöl","sonnenblumenöl","speiseöl","kokosöl","bratöl","öl zum braten","olivenoel","sesamöl"],k:884,p:0,u:[["EL",10],["TL",5],["Schuss",15],["ml",1],["g",1]]},
+{n:"Mayonnaise",a:["mayonnaise","mayo","majo","salatmayonnaise","remoulade","mayo pommes","miracel whip","aioli"],k:680,p:1.2,u:[["EL",15],["TL",5],["Portion",20],["g",1]]},
+{n:"Ketchup",a:["ketchup","tomatenketchup","catchup","curryketchup","ketchup pommes","tomatensoße ketchup"],k:105,p:1.4,u:[["EL",20],["Portion",20],["TL",7],["g",1]]},
+{n:"Senf",a:["senf","mittelscharfer senf","süßer senf","dijon senf","löwensenf","senf mittelscharf","bautz'ner","bautzner senf"],k:90,p:6.0,u:[["TL",5],["EL",15],["Portion",10],["g",1]]},
+{n:"Salatdressing (Vinaigrette/Joghurt)",a:["dressing","salatdressing","vinaigrette","joghurtdressing","french dressing","balsamico dressing","essig öl dressing","caesar dressing","italian dressing","kräuterdressing","salatsoße"],k:200,p:1.0,u:[["EL",15],["Portion",30],["TL",5],["g",1]]},
+{n:"Balsamico / Essig",a:["balsamico","essig","aceto balsamico","balsamessig","apfelessig","weißweinessig","essig balsamico","balsamicocreme"],k:90,p:0.5,u:[["EL",15],["TL",5],["Schuss",10],["ml",1],["g",1]]},
+{n:"Tomatensoße / Pastasauce",a:["tomatensauce","tomatensoße","pastasauce","passierte tomaten","tomatenmark","pizzasauce","tomatensoße fertig","tomaten dose","gehackte tomaten","arrabbiata","sugo","pomodoro soße"],k:50,p:1.8,u:[["Portion",150],["EL",20],["Glas",350],["g",1]]},
+{n:"Sojasoße",a:["sojasoße","sojasauce","soja soße","sojasauce salzig","kikkoman","sojasauce light"],k:70,p:7.0,u:[["EL",15],["TL",5],["Schuss",10],["ml",1],["g",1]]},
+{n:"Bratensoße / Rahmsoße",a:["bratensoße","soße","sauce","rahmsoße","jägersoße","pilzrahmsoße","käsesoße","sahnesoße","bechamel","béchamel","currysoße","gulaschsoße","soße braun","bratensauce"],k:70,p:1.5,u:[["Portion",100],["Schöpfkelle",60],["EL",20],["g",1]]},
+{n:"Zucker",a:["zucker","haushaltszucker","kristallzucker","puderzucker","brauner zucker","rohrzucker","würfelzucker","zucker kaffee","kaffee zucker"],k:400,p:0,u:[["TL",5],["Stück",3],["EL",15],["g",1]]},
+{n:"Süßstoff / Süßungsmittel",a:["süßstoff","sweetener","stevia","erythrit","xylit","süßstofftablette","süßungsmittel","sucralose"],k:0,p:0,u:[["Tablette",0.1],["TL",3],["g",1]]},
+{n:"Mehl",a:["mehl","weizenmehl","mehl 405","vollkornmehl","dinkelmehl","roggenmehl","speisestärke","stärke","paniermehl","semmelbrösel"],k:340,p:10.0,u:[["EL",10],["Portion",50],["Tasse",120],["g",1]]},
+{n:"Pfannkuchen / Eierkuchen",a:["pfannkuchen","eierkuchen","crepes","crêpe","palatschinken","pancakes","pancake","pfannkuchen süß","kaiserschmarrn","waffel","waffeln süß"],k:210,p:6.5,u:[["Stück",80],["Portion",200],["Pancake",60],["g",1]]},
+{n:"Knödel / Klöße",a:["knödel","klöße","kloß","kartoffelknödel","semmelknödel","serviettenknödel","kartoffelklöße","thüringer klöße","knödel kartoffel","semmelknödel fertig","knödel gekocht"],k:135,p:3.0,u:[["Stück",120],["Portion",240],["g",1]]},
+{n:"Schweinebraten mit Knödel und Soße",a:["schweinebraten mit knödel","krustenbraten","schäufele","schweinshaxe","haxe","eisbein","bratwurst mit sauerkraut","sauerbraten mit klößen","braten mit beilage"],k:180,p:13.0,u:[["Portion",450],["Teller",500],["g",1]]},
+{n:"Rührei mit Speck",a:["rührei speck","rührei mit schinken","rührei mit speck","omelett schinken","omelett mit käse","omelette mit schinken"],k:195,p:13.0,u:[["Portion",150],["g",1]]},
+{n:"Belegtes Brötchen (Käse)",a:["käsebrötchen","brötchen mit käse","käse brötchen","belegtes brötchen","brötchen belegt","käsebrötchen belegt","kantinenbrötchen"],k:270,p:12.0,u:[["Stück",110],["g",1]]},
+{n:"Belegtes Brötchen (Wurst/Schinken)",a:["schinkenbrötchen","wurstbrötchen","brötchen mit schinken","brötchen mit wurst","salamibrötchen","brötchen mit salami","brötchen mit fleischwurst","gelbwurst","fleischwurst"],k:250,p:12.0,u:[["Stück",110],["g",1]]},
+{n:"Sandwich (Hähnchen/Käse)",a:["sandwich","clubsandwich","club sandwich","baguette","belegtes baguette","subway","panini","wrap","hähnchenwrap","wrap hähnchen","toast hawaii","tost","sandwich toast"],k:220,p:11.0,u:[["Stück",250],["Halbes",150],["Wrap",200],["g",1]]},
+{n:"Burrito / Wrap mit Füllung",a:["burrito","burritos","fajita","fajitas","tortilla wrap","taco","tacos","quesadilla","enchilada","wrap mexikanisch","bean burrito"],k:200,p:9.0,u:[["Stück",300],["Taco",100],["Portion",350],["g",1]]},
+{n:"Gnocchi",a:["gnocchi","gnocchi gekocht","kartoffelgnocchi","gnocchi pfanne","gnocchi mit soße"],k:150,p:3.5,u:[["Portion",250],["Teller",350],["g",1]]},
+{n:"Ravioli / Tortellini",a:["ravioli","tortellini","tortelloni","ravioli dose","ravioli in tomatensoße","tortellini gekocht","ravioli gekocht","cappelletti","maultaschen gefüllt"],k:140,p:6.0,u:[["Portion",250],["Dose",400],["Teller",300],["g",1]]},
+{n:"Reisnudeln / Asia-Nudeln",a:["asianudeln","gebratene nudeln","mie nudeln","chinesische nudeln","wok nudeln","reisnudeln","glasnudeln","ramen","instantnudeln","instant nudeln","pad thai","nasi goreng","gebratener reis","bami goreng","chop suey","chinapfanne"],k:150,p:5.5,u:[["Portion",350],["Teller",450],["Packung",85],["g",1]]},
+{n:"Sushi (vegetarisch) / Reisbällchen",a:["sushi vegetarisch","sushi gurke","maki gurke","onigiri","sushi reis"],k:150,p:3.0,u:[["Stück",25],["Portion",200],["g",1]]},
+{n:"Hähnchen-Salat / Nudelsalat mit Hähnchen",a:["hähnchensalat","salat mit hähnchen","hähnchen salat","caesar salad hähnchen","salat mit hühnchen","salat mit putenstreifen","putensalat","salat mit hähnchenbrust","bowl hähnchen","poke bowl"],k:110,p:10.0,u:[["Schüssel",350],["Portion",300],["g",1]]},
+{n:"Rührtofu",a:["rührtofu","tofu rührei","tofu scramble","vegan rührei"],k:130,p:12.0,u:[["Portion",150],["g",1]]},
+{n:"Kürbis / Möhrengemüse gegart",a:["kürbis","hokkaido","butternut","kürbisgemüse","ofenkürbis","möhrengemüse","karottengemüse","gekochte karotten","kürbis gebacken"],k:30,p:1.0,u:[["Portion",200],["Beilage",150],["g",1]]},
+{n:"Gemüsebrühe / Bouillon",a:["gemüsebrühe","hühnerbrühe","rinderbrühe","klare brühe","bouillon","brühe klar","gemüsebouillon","brühwürfel","instantbrühe"],k:5,p:0.3,u:[["Tasse",250],["Teller",300],["ml",1],["g",1]]},
+{n:"Linsen-/Kichererbsen-Aufstrich / Brotaufstrich vegan",a:["veganer aufstrich","brotaufstrich","pflanzlicher aufstrich","vegane streichwurst","aufstrich","bruschetta aufstrich","tartex","schmelzkäse","schmelzkäseecke","streichkäse"],k:260,p:7.0,u:[["Portion",25],["EL",20],["Ecke",20],["g",1]]},
+{n:"Kokosmilch",a:["kokosmilch","kokos milch","kokosmilch dose","kokosdrink","kokoswasser","kokosraspeln","kokosnuss"],k:170,p:1.5,u:[["Dose",400],["EL",15],["Portion",100],["ml",1],["g",1]]},
+{n:"Smoothie",a:["smoothie","fruchtsmoothie","obstsmoothie","grüner smoothie","innocent","smoothie banane","bananenshake","smoothie flasche"],k:55,p:0.8,u:[["Flasche",250],["Glas",200],["ml",1],["g",1]]},
+{n:"Banane getrocknet / Bananenchips",a:["bananenchips","trockenbanane","fruchtchips","apfelchips","getrocknete banane"],k:480,p:2.0,u:[["Handvoll",30],["Portion",40],["g",1]]},
+{n:"Fruchtmus / Apfelmus",a:["apfelmus","apfelmark","fruchtmus","fruchtmark","quetschie","quetschy","obstmus","pouchy","fruchtpüree","compote","kompott","obstsalat dose"],k:55,p:0.3,u:[["Portion",100],["Quetschie",90],["Glas",360],["g",1]]},
+{n:"Obstsalat",a:["obstsalat","fruchtsalat","obstsalat frisch","fruit salad","fruchtbecher","obstteller","obst"],k:55,p:0.7,u:[["Schüssel",200],["Portion",150],["Becher",250],["g",1]]},
+{n:"Rührkuchen mit Schokolade / Brownie",a:["brownie","brownies","muffin","muffins","schokomuffin","cupcake","cupcakes","donut glasiert","schoko muffin","kuchen schoko","schokokuchen","schokoladenkuchen"],k:420,p:6.0,u:[["Stück",90],["Brownie",60],["Muffin",100],["g",1]]},
+{n:"Hefezopf / Rosinenbrötchen",a:["hefezopf","rosinenbrötchen","rosinenbrot","milchbrötchen","stuten","zopf","butterzopf","hefeteilchen","franzbrötchen","plundergebäck","plunder","puddingteilchen","puddingbrezel","nussschnecke","zimtschnecke","schnecke"],k:340,p:7.5,u:[["Stück",90],["Scheibe",50],["Brötchen",70],["g",1]]},
+{n:"Chia / Leinsamen / Kerne",a:["chiasamen","chia","leinsamen","kürbiskerne","sonnenblumenkerne","sesam","flohsamen","haferkleie","kerne","samen","pinienkerne","nuss mix","studentenfutter ohne"],k:500,p:20.0,u:[["EL",10],["TL",4],["Handvoll",30],["g",1]]},
+{n:"Eiweißbrot / Proteinbrot",a:["eiweißbrot","eiweissbrot","proteinbrot","protein brot","low carb brot","lowcarb brot","eiweiß brötchen","protein brötchen","proteinbrötchen","harry protein","lizza brot"],k:240,p:25.0,u:[["Scheibe",40],["Brötchen",70],["g",1]]},
+{n:"Knäckebrot",a:["knäckebrot","knaeckebrot","knäcke","wasa","crispbread","vollkornknäcke","dinkelknäcke","roggenknäcke","zwieback"],k:340,p:10.0,u:[["Scheibe",10],["Stück",12],["g",1]]},
+{n:"Eisbecher / Milchshake",a:["milchshake","eisbecher","spaghettieis","eiskaffee","eis becher","sundae","eis mit sahne","mcflurry","frozen yogurt","milchshake schoko","shake mcdonalds"],k:170,p:3.5,u:[["Becher",250],["Glas",300],["Portion",200],["g",1]]},
+{n:"Hähnchen-Döner-Box / Hähnchenspieß",a:["hähnchenspieß","hähnchenspiess","schaschlik","fleischspieß","spieß","grillspieß","souvlaki","gyros","gyros teller","gyros mit tzatziki","gyros pita","pita gyros","hähnchen spieß"],k:185,p:19.0,u:[["Spieß",150],["Portion",250],["Teller",400],["g",1]]},
+{n:"Tzatziki",a:["tzatziki","zaziki","jogurtdip","kräuterquark","kräuter dip","dip","joghurt dip","sourcream","schmand","saure sahne","crème fraîche","creme fraiche","schmand 20","schmand 24%"],k:150,p:3.0,u:[["EL",20],["Portion",50],["Becher",150],["g",1]]},
+{n:"Kokos-Reis-Pfanne mit Gemüse (vegetarisch)",a:["gemüsecurry","gemüse curry","veganes curry","linsencurry","kichererbsencurry","dal","dhal","linsen dal","kichererbsen curry","gemüsereis"],k:115,p:3.8,u:[["Portion",400],["Teller",450],["g",1]]},
+{n:"Rührei-Brötchen / Frühstücksbrötchen mit Ei",a:["eierbrötchen","brötchen mit ei","frühstücksbrötchen","egg mcmuffin","mcmuffin","bagel","bagel mit frischkäse","bagel belegt","breakfast sandwich"],k:240,p:11.0,u:[["Stück",150],["Bagel",110],["g",1]]},
+{n:"Fischstäbchen-freie Panade / Backofen-Gemüse",a:["gemüsenuggets","veggie nuggets","gemüsebratling","veggie bratling","gemüseschnitzel","bratling","hirsebratling","vegane nuggets","pflanzliche nuggets","veggie schnitzel","vegetarisches schnitzel"],k:210,p:11.0,u:[["Stück",80],["Portion",160],["g",1]]},
+{n:"Bratwurst vegan / Veggie Würstchen",a:["veggie würstchen","vegane würstchen","veganes würstchen","tofuwurst","vegane wiener","veggie wiener","veggie wurst","vegane currywurst"],k:230,p:15.0,u:[["Stück",80],["g",1]]}
+];
+
+/* ===== Zusatz 3: Schnell eintragen (Text -> kcal und Eiweiß) ===== */
+const NUMW={ein:1,eine:1,einen:1,einem:1,zwei:2,drei:3,vier:4,fuenf:5,sechs:6,sieben:7,acht:8,neun:9,zehn:10,halb:0.5,halbe:0.5,halben:0.5};
+const GUNIT={g:1,gr:1,gramm:1,kg:1000,ml:1,l:1000,liter:1000,el:12,tl:4};
+const nm=s=>String(s).toLowerCase().replace(/ß/g,"ss").replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/[^a-z0-9% ]/g," ").replace(/\s+/g," ").trim();
+FOODDB.forEach(f=>{f._a=[nm(f.n)].concat(f.a.map(nm));f._u=f.u.map(x=>[nm(x[0]),x[1],x[0]]);});
+const stripPl=w=>w.replace(/(en|n|e|s)$/,"");
+function scoreFood(f,q){
+  let best=0; const qt=q.split(" ");
+  for(const al of f._a){
+    let s=0;
+    if(q===al) s=100+al.length;
+    else if((" "+q+" ").includes(" "+al+" ")) s=60+al.length;
+    else if(al.length>=3&&q.length>=3&&al.includes(q)) s=40+10*q.length/al.length;
+    else{const at=al.split(" ");const hit=qt.filter(w=>w.length>=3&&at.some(x=>x===w||stripPl(x)===stripPl(w))).length;if(hit)s=20*hit/qt.length+hit;}
+    if(s>best) best=s;
+  }
+  return best;
+}
+function findFoods(q){
+  if(!q) return [];
+  return FOODDB.map(f=>({f,s:scoreFood(f,q)})).filter(x=>x.s>0).sort((a,b)=>b.s-a.s).slice(0,4).map(x=>x.f);
+}
+function parsePiece(raw){
+  let t=nm(raw.replace(/(\d)([a-zA-Zäöüß])/g,"$1 $2").replace(/(\d),(\d)/g,"$1.$2")); if(!t) return null;
+  let tok=t.split(" "), n=1, hasN=false;
+  if(/^\d+(\.\d+)?$/.test(tok[0])){n=parseFloat(tok[0]);tok.shift();hasN=true;}
+  else if(NUMW[tok[0]]!==undefined){n=NUMW[tok[0]];tok.shift();hasN=true;}
+  let unit="";
+  if(tok.length>1&&(GUNIT[tok[0]]!==undefined)){unit=tok.shift();}
+  else if(tok.length>1&&/^(tasse|tassen|glas|glaeser|flasche|flaschen|dose|dosen|stueck|stk|scheibe|scheiben|portion|portionen|becher|kugel|kugeln|riegel|schale|teller|handvoll)$/.test(tok[0])){unit=tok.shift();}
+  if(tok[0]==="x"||tok[0]==="von") tok.shift();
+  const q=tok.join(" ");
+  return {raw:raw.trim(),q,n,hasN,unit,foods:findFoods(q),fi:0};
+}
+function calcPiece(pc){
+  const f=pc.foods[pc.fi]; if(!f) return null;
+  let g, label;
+  const fmtq=x=>String(Math.round(x*10)/10).replace(".",",");
+  if(pc.unit&&GUNIT[pc.unit]!==undefined&&!["el","tl"].includes(pc.unit)){g=pc.n*GUNIT[pc.unit];label=fmtq(pc.n)+" "+pc.unit;}
+  else if(pc.unit==="el"||pc.unit==="tl"){g=pc.n*GUNIT[pc.unit];label=fmtq(pc.n)+" "+pc.unit.toUpperCase();}
+  else{
+    let u=null; if(pc.unit){u=f._u.find(x=>x[0]===pc.unit||stripPl(x[0])===stripPl(pc.unit));}
+    if(!u) u=f._u.find(x=>x[2]!=="g"&&x[2]!=="ml")||f._u[0];
+    if(u[2]==="g"||u[2]==="ml"){g=pc.n*(pc.hasN?1:100);label=fmtq(g)+" "+u[2];}
+    else{g=pc.n*u[1];label=fmtq(pc.n)+" "+u[2];}
+  }
+  return {f,g,label,k:f.k*g/100,p:f.p*g/100};
+}
+let QP=[];
+function qParse(text){
+  QP=text.split(/\s*(?:,|\+|&|\bund\b|\bplus\b|\bmit\b)\s*/i).map(parsePiece).filter(Boolean);
+}
+function qHtml(){
+  if(!QP.length) return "";
+  let tk=0,tp=0,ok=0;
+  const rows=QP.map((pc,i)=>{
+    const c=calcPiece(pc);
+    if(!c) return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(pc.raw)}</b><span class="meta">Nicht gefunden. Trag Kalorien und Eiweiß unten selbst ein oder scanne den Barcode.</span></div>`;
+    ok++;tk+=c.k;tp+=c.p;
+    const alts=pc.foods.map((f,j)=>j===pc.fi?"":`<button class="chipb" data-qalt="${i}:${j}">${esc(f.n)}</button>`).join("");
+    return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(c.f.n)} · ${esc(c.label)}</b><span class="meta">${Math.round(c.k)} kcal · ${f1(c.p)} g Eiweiß</span>${alts?`<div class="alts">Meintest du: ${alts}</div>`:""}</div>`;
+  }).join("");
+  return `<div class="box" style="margin-top:6px">${rows}</div>`+(ok?`<button class="btn pri" data-qadd style="width:100%;margin-top:8px">Eintragen: ${Math.round(tk)} kcal · ${f1(tp)} g Eiweiß</button>`:"");
+}
+const _dyH2=dyHtml;
+dyHtml=function(){
+  return _dyH2().replace('<h3 class="sec">Rezept eintragen</h3>',
+   `<h3 class="sec">Schnell eintragen</h3>
+   <input id="qk" class="finp" placeholder="z. B. 4 Kaffee, 2 Brötchen mit Butter, Pommes" autocomplete="off" autocapitalize="none" aria-label="Was hast du gegessen oder getrunken?">
+   <div id="qkp">${qHtml()}</div>
+   <div class="stack"><button class="btn" data-scan>Barcode scannen</button></div>
+   <h3 class="sec">Rezept eintragen</h3>`);
+};
+document.addEventListener("input",ev=>{
+  if(ev.target.id==="qk"){qParse(ev.target.value);$("#qkp").innerHTML=qHtml();}
+});
+document.addEventListener("click",ev=>{
+  const t=ev.target.closest("button"); if(!t||pm!=="Y"||pnl.hidden) return; const d=t.dataset;
+  if(d.qalt){const [i,j]=d.qalt.split(":").map(Number);QP[i].fi=j;$("#qkp").innerHTML=qHtml();return}
+  if(d.qadd!==undefined){let n=0;QP.forEach(pc=>{const c=calcPiece(pc);if(c){addEntry({n:c.f.n+" ("+c.label+")",k:c.k,p:c.p});n++;}});QP=[];drawDy(true);toast(n+" Eintrag"+(n>1?"e":"")+" gespeichert");return}
+});
+
+/* ===== Zusatz 4: Barcode-Scanner mit Open Food Facts ===== */
+const OFFK="kochplaner.off.v1";
+let OFFC={}; try{OFFC=JSON.parse(localStorage.getItem(OFFK))||{};}catch(e){}
+const scn=document.createElement("div"); scn.id="scn"; scn.hidden=true; document.body.appendChild(scn);
+let scnStream=null,scnRun=false,scnLoaded=null,SCP=null;
+function loadBD(){
+  if(scnLoaded) return scnLoaded;
+  scnLoaded=new Promise((res,rej)=>{
+    if(window.BarcodeDetectionAPI||window.BarcodeDetector){res();return}
+    const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/barcode-detector@3.1.2/dist/iife/ponyfill.min.js";
+    s.onload=res; s.onerror=()=>{scnLoaded=null;rej(new Error("load"));}; document.head.appendChild(s);
+  });
+  return scnLoaded;
+}
+function stopCam(){scnRun=false;if(scnStream){scnStream.getTracks().forEach(t=>t.stop());scnStream=null;}}
+function closeScan(){stopCam();scn.hidden=true;scn.innerHTML="";}
+function scanShell(inner){scn.innerHTML=`<div class="scbar"><button class="back" data-scx>Schließen</button></div><div class="scbody">${inner}</div>`;}
+async function openScan(){
+  scn.hidden=false;
+  scanShell(`<video id="scv" playsinline muted autoplay></video><p class="scs" id="scs">Kamera wird gestartet …</p>
+   <div class="frm" style="margin-top:10px"><label class="full">Oder Nummer unter dem Barcode eintippen<input id="scm" inputmode="numeric" placeholder="4008400402222"></label><button class="btn full" data-scgo>Suchen</button></div>`);
+  try{
+    await loadBD();
+    const BD=(window.BarcodeDetectionAPI&&window.BarcodeDetectionAPI.BarcodeDetector)||window.BarcodeDetector;
+    const det=new BD({formats:["ean_13","ean_8","upc_a","upc_e"]});
+    scnStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},audio:false});
+    const v=$("#scv"); if(!v){stopCam();return}
+    v.srcObject=scnStream; await v.play(); $("#scs").textContent="Halte den Barcode ruhig ins Bild."; scnRun=true;
+    const loop=async()=>{
+      if(!scnRun) return;
+      try{const c=await det.detect(v); if(c.length){scnRun=false;stopCam();lookup(c[0].rawValue);return}}catch(e){}
+      setTimeout(loop,150);
+    };
+    loop();
+  }catch(e){const s=$("#scs"); if(s) s.textContent="Kamera nicht verfügbar. Tippe die Nummer unter dem Barcode ein.";}
+}
+async function offFetch(ean){
+  const url="https://world.openfoodfacts.org/api/v2/product/"+ean+".json?fields=product_name,brands,nutriments,serving_size,serving_quantity";
+  let r; try{r=await fetch(url,{headers:{"X-User-Agent":"Kochplaner/1.0 (github.com/danielgergel/Kochplaner)"}});}catch(e){r=await fetch(url);}
+  if(!r.ok) throw new Error("http");
+  const j=await r.json(); const pr=j&&j.product; if(!pr) return null;
+  const nu=pr.nutriments||{}; let k=nu["energy-kcal_100g"]; if(k==null&&nu["energy_100g"]!=null) k=nu["energy_100g"]/4.184;
+  const pp=nu["proteins_100g"];
+  return {n:((pr.brands?String(pr.brands).split(",")[0]+" ":"")+(pr.product_name||"Unbekanntes Produkt")).trim(),k:k==null?null:Math.round(k),p:pp==null?null:Math.round(pp*10)/10,s:parseFloat(pr.serving_quantity)||null,ss:pr.serving_size||""};
+}
+async function lookup(ean){
+  ean=String(ean).replace(/\D/g,"");
+  if(ean.length<8){toast("Ungültige Nummer");return}
+  scanShell(`<p class="scs">Suche ${ean} …</p>`);
+  let p=OFFC[ean];
+  if(!p){
+    try{p=await offFetch(ean);}catch(e){scanShell(`<p class="scs">Keine Verbindung zu Open Food Facts. Versuche es später noch einmal.</p><div class="stack"><button class="btn" data-scr>Nochmal scannen</button></div>`);return}
+    if(p){OFFC[ean]=p;try{localStorage.setItem(OFFK,JSON.stringify(OFFC));}catch(e){}}
+  }
+  if(!p){scanShell(`<p class="scs">Produkt ${ean} wurde nicht gefunden. Du kannst es unter „Eigener Eintrag“ selbst eintragen.</p><div class="stack"><button class="btn" data-scr>Nochmal scannen</button></div>`);return}
+  showProd(p);
+}
+function showProd(p){
+  SCP={p:Object.assign({},p)}; const miss=p.k==null;
+  scanShell(`<h2 style="margin:0 0 4px;font-size:22px;line-height:1.25">${esc(p.n)}</h2>
+   <p class="scs">${miss?"Keine Nährwerte hinterlegt. Trag die Werte pro 100 g von der Verpackung ein.":`Pro 100 g: ${p.k} kcal · ${p.p==null?"?":f1(p.p)} g Eiweiß`}</p>
+   <div class="frm">${miss?`<label>kcal pro 100 g<input id="sck" inputmode="numeric"></label><label>Eiweiß pro 100 g<input id="scp" inputmode="decimal"></label>`:""}
+   <label class="full">Menge in g oder ml${p.s?` (Portion laut Packung: ${esc(p.ss||p.s+" g")})`:""}<input id="sca" inputmode="decimal" value="${p.s||100}"></label>
+   <div class="full scsum" id="scsum"></div>
+   <button class="btn pri full" data-scadd>Ins Tagebuch eintragen</button></div>
+   <div class="stack"><button class="btn" data-scr>Nochmal scannen</button></div>
+   <p class="note">Daten: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL). Werte können abweichen, bitte mit der Packung vergleichen.</p>`);
+  scUpd();
+}
+function scUpd(){
+  if(!SCP) return; const p=SCP.p, g=id=>{const e=$(id);return e?parseFloat(e.value.replace(",","."))||0:0;};
+  const a=g("#sca"), k=p.k!=null?p.k:g("#sck"), pr=p.p!=null?p.p:g("#scp");
+  SCP.a=a; SCP.kk=k*a/100; SCP.pp=pr*a/100;
+  const s=$("#scsum"); if(s) s.textContent=Math.round(SCP.kk)+" kcal · "+f1(SCP.pp)+" g Eiweiß";
+}
+document.addEventListener("input",ev=>{if(["sca","sck","scp"].includes(ev.target.id))scUpd();});
+document.addEventListener("click",ev=>{
+  const t=ev.target.closest("button"); if(!t) return; const d=t.dataset;
+  if(d.scan!==undefined){openScan();return}
+  if(d.scr!==undefined){openScan();return}
+  if(d.scx!==undefined){closeScan();return}
+  if(d.scgo!==undefined){lookup(($("#scm")||{}).value||"");return}
+  if(d.scadd!==undefined&&SCP){
+    if(!(SCP.a>0)){toast("Bitte eine Menge eintragen");return}
+    if(SCP.kk<=0&&SCP.pp<=0){toast("Bitte Nährwerte eintragen");return}
+    addEntry({n:SCP.p.n+" ("+f1(SCP.a)+" g)",k:SCP.kk,p:SCP.pp});
+    closeScan(); if(pm==="Y"&&!pnl.hidden) drawDy(true); toast("Eingetragen"); return;
+  }
+});
+
+/* ===== Zusatz 5: Angebote vergleichen (manuell eingetragen) ===== */
+if(!Array.isArray(ST.offers)) ST.offers=[];
+const STORES=["REWE","Lidl","Aldi","Edeka","Kaufland","Penny","Netto","Anderer"];
+const offerMatch=(a,b)=>{
+  a=nm(a);b=nm(b); if(!a||!b) return false;
+  if(a.includes(b)||b.includes(a)) return true;
+  const aw=a.split(" ").filter(w=>w.length>=4), bw=b.split(" ");
+  return aw.some(w=>bw.some(x=>x.length>=4&&(x===w||stripPl(x)===stripPl(w))));
+};
+function offersCompare(){
+  const L=shopList(ST.sel), labels=[]; CATS.forEach(c=>L.out[c].forEach(x=>labels.push(x.l)));
+  const today=dkey(new Date()), live=(ST.offers||[]).filter(o=>!o.u||o.u>=today), by={};
+  live.forEach(o=>{const m=labels.find(l=>offerMatch(o.i,l)); if(!m) return; const b=by[o.s]||(by[o.s]={});if(!b[m]||(parseFloat(String(o.pr).replace(",","."))||0)<(parseFloat(String(b[m].pr).replace(",","."))||0)) b[m]=o;});
+  const rows=Object.keys(by).map(s=>({s,items:Object.keys(by[s]).map(l=>({l,o:by[s][l]}))})).sort((a,b)=>b.items.length-a.items.length);
+  return {rows,total:labels.length,live:live.length};
+}
+const ofDate=u=>{if(!u)return"";const [a,b,c]=u.split("-");return " bis "+c+"."+b+".";};
+function offersHtml(){
+  const C=offersCompare(), today=dkey(new Date());
+  const res=!ST.offers.length?'<p class="empty" style="padding:6px 0">Noch keine Angebote eingetragen. Schau in die Prospekte und trag ein, was dich interessiert.</p>'
+   :!C.total?'<p class="empty" style="padding:6px 0">Wähle Rezepte im Plan, dann siehst du, welcher Laden für deine Liste am meisten bietet.</p>'
+   :!C.rows.length?'<p class="empty" style="padding:6px 0">Keine eingetragenen Angebote passen zu deiner Einkaufsliste.</p>'
+   :C.rows.map((r,i)=>`<div class="ofr${i===0?" best":""}"><b>${i===0?"Beste Wahl: ":""}${esc(r.s)}</b><span class="meta" style="display:block">${r.items.length} von ${C.total} Artikeln im Angebot</span>${r.items.map(x=>`<span class="meta" style="display:block">${esc(x.l)}: ${esc(x.o.pr||"Angebot")}${x.o.pr&&!/€/.test(x.o.pr)?" €":""}${ofDate(x.o.u)}</span>`).join("")}</div>`).join("");
+  const links=STORES.slice(0,7).map(s=>`<a class="chipb" href="https://www.google.com/search?q=${encodeURIComponent(s+" Angebote diese Woche")}" target="_blank" rel="noopener">${s}</a>`).join("")+
+    `<a class="chipb" href="https://www.kaufda.de/" target="_blank" rel="noopener">kaufDA</a><a class="chipb" href="https://www.marktguru.de/" target="_blank" rel="noopener">marktguru</a>`;
+  const list=ST.offers.map((o,i)=>`<div class="ent"><b>${esc(o.i)}</b><span class="meta">${esc(o.s)} · ${esc(o.pr||"")}${o.pr&&!/€/.test(o.pr)?" €":""}${ofDate(o.u)}${o.u&&o.u<today?" · abgelaufen":""}</span><div class="eac"><button data-ofx="${i}" aria-label="Angebot löschen">×</button></div></div>`).join("");
+  return `<h3 class="sec">Angebote vergleichen</h3>
+  <div class="box" style="padding:12px">
+   <div id="ofres">${res}</div>
+   <p class="note" style="margin:10px 0 6px">Angebote der Händler schaust du in den Prospekten an (öffnet im Browser). Die App holt sie nicht von allein, weil es dafür keine offene Schnittstelle gibt.</p>
+   <div class="alts" style="margin-top:0">${links}</div>
+  </div>
+  <h3 class="sec">Angebot eintragen</h3>
+  <div class="frm">
+   <label class="full">Artikel<input id="of-i" placeholder="z. B. Hähnchenbrust" autocomplete="off"></label>
+   <label>Händler<select id="of-s">${STORES.map(s=>`<option>${s}</option>`).join("")}</select></label>
+   <label>Preis<input id="of-p" inputmode="decimal" placeholder="1,99"></label>
+   <label class="full">Gültig bis (optional)<input id="of-u" type="date"></label>
+   <button class="btn pri full" data-ofadd>Angebot speichern</button>
+  </div>
+  ${ST.offers.length?`<div class="box" style="margin-top:10px">${list}</div>`:""}`;
+}
+const _shopH=shopHtml;
+shopHtml=function(){return _shopH()+offersHtml();};
+document.addEventListener("click",ev=>{
+  const t=ev.target.closest("button"); if(!t||tab!=="E") return; const d=t.dataset;
+  if(d.ofadd!==undefined){
+    const i=$("#of-i").value.trim(); if(!i){toast("Bitte einen Artikel eintragen");return}
+    ST.offers.push({i,s:$("#of-s").value,pr:$("#of-p").value.trim(),u:$("#of-u").value||""});
+    if(ST.offers.length>200) ST.offers.shift();
+    persist(); const y=window.scrollY; render(); window.scrollTo(0,y); toast("Angebot gespeichert"); return;
+  }
+  if(d.ofx!==undefined){ST.offers.splice(+d.ofx,1);persist();const y=window.scrollY;render();window.scrollTo(0,y);return}
+});
+const _hh2=hhHtml;
+hhHtml=function(){return _hh2().replace(/<\/div>$/,`<h3 class="sec">Datenquellen</h3><p class="note" style="margin-top:0">Gescannte Produkte: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL). Die Werte beim Schnell-Eintragen sind Durchschnittswerte und können abweichen.</p></div>`);};
 
 render();
 </script>
