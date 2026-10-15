@@ -184,6 +184,28 @@ h1{font-family:var(--f-disp);font-weight:700;font-size:30px;letter-spacing:.01em
 .ofr{padding:8px 0;border-top:1px solid var(--line)}
 .ofr:first-child{border-top:0;padding-top:0}
 .ofr.best b{color:var(--accent)}
+main{padding-bottom:70px}
+#fab{position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:12;display:flex;align-items:center;gap:8px;min-height:54px;padding:0 20px;border-radius:27px;border:0;background:var(--accent);color:var(--accent-fg);font-family:var(--f-disp);font-weight:700;font-size:21px;letter-spacing:.03em;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+#fab svg{width:25px;height:25px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.scchk{border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:3px;font-size:15px}
+.scchk b{font-family:var(--f-disp);font-size:25px;line-height:1.1}
+.scchk.ok{background:var(--done);border:1px solid var(--accent)}
+.scchk.ok b{color:var(--accent)}
+.scchk.over{background:rgba(217,119,6,.14);border:1px solid var(--warn)}
+.scchk.over b{color:var(--warn)}
+details.fold{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin:10px 0;padding:0 12px}
+details.fold>summary{min-height:48px;display:flex;align-items:center;font-family:var(--f-disp);font-size:18px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);cursor:pointer;list-style:none}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::after{content:"+";margin-left:auto;font-size:24px}
+details.fold[open]>summary::after{content:"−"}
+details.fold[open]{padding-bottom:12px}
+details.fold .box,details.fold .frm{border:0;padding:0}
+a{color:var(--accent)}
+.ic{gap:4px}
+.ic button{width:44px;height:44px}
+.step button,.ent .eac button{width:44px;height:44px}
+.chipb{min-height:40px}
+.chips button{min-height:42px}
 
 body{padding-top:env(safe-area-inset-top,0px)}</style>
 
@@ -646,7 +668,7 @@ const f1=n=>String(Math.round(n*10)/10).replace(".",",");
 function tot(k){const e=DY.days[k]||[];return{k:e.reduce((a,x)=>a+x.k*x.m,0),p:e.reduce((a,x)=>a+x.p*x.m,0)};}
 function addEntry(e,k){const key=k||dyk;(DY.days[key]||(DY.days[key]=[])).push(Object.assign({m:1},e));
   const keys=Object.keys(DY.days).sort(); while(keys.length>400) delete DY.days[keys.shift()]; dsave();}
-function barHtml(v,g){const pct=g?Math.min(100,v/g*100):0;return `<div class="bar${v>g?" over":""}"><i style="width:${pct}%"></i></div>`;}
+function barHtml(v,g,min){const pct=g?Math.min(100,v/g*100):0;return `<div class="bar${!min&&v>g?" over":""}"><i style="width:${pct}%"></i></div>`;}
 function dyResHtml(){
   const q=dyq.trim().toLowerCase(); let rows;
   if(q) rows=ALL.filter(r=>(r.n+" "+r.id).toLowerCase().includes(q)).slice(0,8);
@@ -661,7 +683,7 @@ function dyHtml(){
   <div class="dbody"><h2>Tagebuch</h2>
   <div class="dnav"><button data-dyd="-1" aria-label="Vorheriger Tag">‹</button><b>${dlabel(dyk)}</b><button data-dyd="1" aria-label="Nächster Tag">›</button></div>
   <div class="tot"><div><div class="row1"><b>${Math.round(t.k)} kcal</b><span>Ziel ${G.k} · noch ${Math.round(G.k-t.k)}</span></div>${barHtml(t.k,G.k)}</div>
-   <div><div class="row1"><b>${f1(t.p)} g Eiweiß</b><span>Ziel ${G.p} · noch ${f1(G.p-t.p)}</span></div>${barHtml(t.p,G.p)}</div></div>
+   <div><div class="row1"><b>${f1(t.p)} g Eiweiß</b><span>Ziel ${G.p} · noch ${f1(G.p-t.p)}</span></div>${barHtml(t.p,G.p,true)}</div></div>
   <h3 class="sec">Gegessen</h3>
   ${ents.length?`<div class="box">`+ents.map((e,i)=>`<div class="ent"><b>${esc(e.n)}</b><span class="meta">${Math.round(e.k*e.m)} kcal · ${f1(e.p*e.m)} g Eiweiß</span><div class="eac"><button data-dym="${i}:-0.5" aria-label="Weniger">−</button><span>${f1(e.m)}×</span><button data-dym="${i}:0.5" aria-label="Mehr">+</button><button data-dyx="${i}" aria-label="Löschen">×</button></div></div>`).join("")+`</div>`:'<p class="empty">An diesem Tag ist noch nichts eingetragen.</p>'}
   <h3 class="sec">Rezept eintragen</h3>
@@ -689,22 +711,29 @@ const hm=(location.hash||"").match(/h=([a-z0-9]{16,64})/i);
 if(hm){HH={mode:"cloud",code:hm[1].toLowerCase()};hsave();try{history.replaceState(null,"",location.pathname+location.search);}catch(e){}}
 const SH=["sel","sc","fr","cust","done","offers"];
 let fbRef=null,unsub=null,last={},syncState="off",ready=false;
+const SYK="kochplaner.sync.v1";
+const saveLast=()=>{try{localStorage.setItem(SYK,JSON.stringify(last))}catch(e){}};
 function chip(){const b=$("#bhh");if(!b)return;b.classList.toggle("sync",syncState==="online");b.classList.toggle("err",syncState==="error");}
 function stopSync(){if(unsub){unsub();unsub=null}fbRef=null;last={};ready=false;syncState="off";chip();}
 function startSync(){
   if(!window.FB||!HH||HH.mode!=="cloud"||!HH.code) return; stopSync();
+  try{last=JSON.parse(localStorage.getItem(SYK)||"{}")||{};}catch(e){last={};}
   fbRef=FB.doc(FB.db,"households",HH.code);
   unsub=FB.onSnapshot(fbRef,snap=>{
     if(snap.metadata.hasPendingWrites) return;
     syncState=snap.metadata.fromCache?"off":"online"; chip();
     if(!snap.exists()){if(!snap.metadata.fromCache){ready=true;pushShared(true);}return}
     applyRemote(snap.data());
-    if(!snap.metadata.fromCache) ready=true;
+    if(!snap.metadata.fromCache){ready=true;pushShared(false);}
   },()=>{syncState="error";chip();});
 }
 function applyRemote(d){
   let ch=false,cust=false;
-  SH.forEach(k=>{const s=d[k+"S"]; if(typeof s==="string"&&s!==last[k]){last[k]=s;try{ST[k]=JSON.parse(s);ch=true;if(k==="cust")cust=true;}catch(e){}}});
+  SH.forEach(k=>{const s=d[k+"S"]; if(typeof s!=="string"||s===last[k]) return;
+    const loc=JSON.stringify(ST[k]||(k==="cust"||k==="offers"?[]:{}));
+    if(last[k]!==undefined&&loc!==last[k]) return; /* eigene, noch nicht gesendete Änderung bleibt erhalten */
+    last[k]=s;try{ST[k]=JSON.parse(s);ch=true;if(k==="cust")cust=true;}catch(e){}});
+  saveLast();
   if(!ch) return;
   try{localStorage.setItem(LS,JSON.stringify(ST))}catch(e){}
   if(cust) rebuildAll();
@@ -715,11 +744,11 @@ flush=function(){pushShared(false);};
 function pushShared(force){
   if(!fbRef||!ready) return;
   if(saving){dirty=true;return}
-  const o={},sent=[];
-  SH.forEach(k=>{const s=JSON.stringify(ST[k]||(k==="cust"||k==="offers"?[]:{})); if(force||s!==last[k]){o[k+"S"]=s;sent.push(k);last[k]=s;}});
+  const o={},sent=[],prev={};
+  SH.forEach(k=>{const s=JSON.stringify(ST[k]||(k==="cust"||k==="offers"?[]:{})); if(force||s!==last[k]){o[k+"S"]=s;sent.push(k);prev[k]=last[k];last[k]=s;}});
   if(!sent.length) return;
   o.u=Date.now(); saving=true;
-  FB.setDoc(fbRef,o,{merge:true}).catch(()=>{sent.forEach(k=>{last[k]=undefined});syncState="error";chip();}).finally(()=>{saving=false;if(dirty){dirty=false;pushShared(false);}});
+  FB.setDoc(fbRef,o,{merge:true}).then(saveLast).catch(()=>{sent.forEach(k=>{last[k]=prev[k]});syncState="error";chip();}).finally(()=>{saving=false;if(dirty){dirty=false;pushShared(false);}});
 }
 const hhUrl=()=>location.origin+location.pathname+"#h="+HH.code;
 function newCode(){const a=new Uint8Array(20);crypto.getRandomValues(a);return Array.from(a,x=>"abcdefghijklmnopqrstuvwxyz0123456789"[x%36]).join("");}
@@ -1106,12 +1135,12 @@ function qHtml(){
 }
 const _dyH2=dyHtml;
 dyHtml=function(){
-  return _dyH2().replace('<h3 class="sec">Rezept eintragen</h3>',
+  return _dyH2().replace('<h3 class="sec">Gegessen</h3>',
    `<h3 class="sec">Schnell eintragen</h3>
    <input id="qk" class="finp" placeholder="z. B. 4 Kaffee, 2 Brötchen mit Butter, Pommes" autocomplete="off" autocapitalize="none" aria-label="Was hast du gegessen oder getrunken?">
    <div id="qkp">${qHtml()}</div>
    <div class="stack"><button class="btn" data-scan>Barcode scannen</button></div>
-   <h3 class="sec">Rezept eintragen</h3>`);
+   <h3 class="sec">Gegessen</h3>`);
 };
 document.addEventListener("input",ev=>{
   if(ev.target.id==="qk"){qParse(ev.target.value);$("#qkp").innerHTML=qHtml();}
@@ -1144,10 +1173,10 @@ async function openScan(){
   scanShell(`<video id="scv" playsinline muted autoplay></video><p class="scs" id="scs">Kamera wird gestartet …</p>
    <div class="frm" style="margin-top:10px"><label class="full">Oder Nummer unter dem Barcode eintippen<input id="scm" inputmode="numeric" placeholder="4008400402222"></label><button class="btn full" data-scgo>Suchen</button></div>`);
   try{
+    scnStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},audio:false});
     await loadBD();
     const BD=(window.BarcodeDetectionAPI&&window.BarcodeDetectionAPI.BarcodeDetector)||window.BarcodeDetector;
     const det=new BD({formats:["ean_13","ean_8","upc_a","upc_e"]});
-    scnStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},audio:false});
     const v=$("#scv"); if(!v){stopCam();return}
     v.srcObject=scnStream; await v.play(); $("#scs").textContent="Halte den Barcode ruhig ins Bild."; scnRun=true;
     const loop=async()=>{
@@ -1156,7 +1185,7 @@ async function openScan(){
       setTimeout(loop,150);
     };
     loop();
-  }catch(e){const s=$("#scs"); if(s) s.textContent="Kamera nicht verfügbar. Tippe die Nummer unter dem Barcode ein.";}
+  }catch(e){stopCam();const s=$("#scs"); if(s) s.textContent="Kamera nicht verfügbar. Tippe die Nummer unter dem Barcode ein.";}
 }
 async function offFetch(ean){
   const url="https://world.openfoodfacts.org/api/v2/product/"+ean+".json?fields=product_name,brands,nutriments,serving_size,serving_quantity";
@@ -1186,6 +1215,7 @@ function showProd(p){
    <div class="frm">${miss?`<label>kcal pro 100 g<input id="sck" inputmode="numeric"></label><label>Eiweiß pro 100 g<input id="scp" inputmode="decimal"></label>`:""}
    <label class="full">Menge in g oder ml${p.s?` (Portion laut Packung: ${esc(p.ss||p.s+" g")})`:""}<input id="sca" inputmode="decimal" value="${p.s||100}"></label>
    <div class="full scsum" id="scsum"></div>
+   <div class="full scchk" id="scchk"></div>
    <button class="btn pri full" data-scadd>Ins Tagebuch eintragen</button></div>
    <div class="stack"><button class="btn" data-scr>Nochmal scannen</button></div>
    <p class="note">Daten: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL). Werte können abweichen, bitte mit der Packung vergleichen.</p>`);
@@ -1196,6 +1226,12 @@ function scUpd(){
   const a=g("#sca"), k=p.k!=null?p.k:g("#sck"), pr=p.p!=null?p.p:g("#scp");
   SCP.a=a; SCP.kk=k*a/100; SCP.pp=pr*a/100;
   const s=$("#scsum"); if(s) s.textContent=Math.round(SCP.kk)+" kcal · "+f1(SCP.pp)+" g Eiweiß";
+  const c=$("#scchk"); if(c){
+    const T=tot(dkey(new Date())), G=DY.goal, restK=G.k-T.k, afterK=restK-SCP.kk, afterP=G.p-T.p-SCP.pp;
+    const ok=afterK>=0;
+    c.className="full scchk "+(ok?"ok":"over");
+    c.innerHTML=`<b>${ok?"Passt noch rein":"Zu viel für heute"}</b><span>Heute schon ${Math.round(T.k)} von ${G.k} kcal. ${ok?"Danach noch "+Math.round(afterK)+" kcal übrig.":"Danach "+Math.round(-afterK)+" kcal über dem Ziel."} Eiweiß: ${afterP>0?"noch "+f1(afterP)+" g offen":"Ziel erreicht"}.</span>`;
+  }
 }
 document.addEventListener("input",ev=>{if(["sca","sck","scp"].includes(ev.target.id))scUpd();});
 document.addEventListener("click",ev=>{
@@ -1235,8 +1271,7 @@ function offersHtml(){
    :!C.total?'<p class="empty" style="padding:6px 0">Wähle Rezepte im Plan, dann siehst du, welcher Laden für deine Liste am meisten bietet.</p>'
    :!C.rows.length?'<p class="empty" style="padding:6px 0">Keine eingetragenen Angebote passen zu deiner Einkaufsliste.</p>'
    :C.rows.map((r,i)=>`<div class="ofr${i===0?" best":""}"><b>${i===0?"Beste Wahl: ":""}${esc(r.s)}</b><span class="meta" style="display:block">${r.items.length} von ${C.total} Artikeln im Angebot</span>${r.items.map(x=>`<span class="meta" style="display:block">${esc(x.l)}: ${esc(x.o.pr||"Angebot")}${x.o.pr&&!/€/.test(x.o.pr)?" €":""}${ofDate(x.o.u)}</span>`).join("")}</div>`).join("");
-  const links=STORES.slice(0,7).map(s=>`<a class="chipb" href="https://www.google.com/search?q=${encodeURIComponent(s+" Angebote diese Woche")}" target="_blank" rel="noopener">${s}</a>`).join("")+
-    `<a class="chipb" href="https://www.kaufda.de/" target="_blank" rel="noopener">kaufDA</a><a class="chipb" href="https://www.marktguru.de/" target="_blank" rel="noopener">marktguru</a>`;
+  const links=`<a class="btn pri" style="display:flex;align-items:center;justify-content:center;text-decoration:none;width:100%" href="https://www.kaufda.de/" target="_blank" rel="noopener">Alle Angebote in kaufDA ansehen</a><a class="chipb" href="https://www.marktguru.de/" target="_blank" rel="noopener" style="margin-top:6px">Alternative: marktguru</a>`;
   const list=ST.offers.map((o,i)=>`<div class="ent"><b>${esc(o.i)}</b><span class="meta">${esc(o.s)} · ${esc(o.pr||"")}${o.pr&&!/€/.test(o.pr)?" €":""}${ofDate(o.u)}${o.u&&o.u<today?" · abgelaufen":""}</span><div class="eac"><button data-ofx="${i}" aria-label="Angebot löschen">×</button></div></div>`).join("");
   return `<h3 class="sec">Angebote vergleichen</h3>
   <div class="box" style="padding:12px">
@@ -1268,6 +1303,49 @@ document.addEventListener("click",ev=>{
 });
 const _hh2=hhHtml;
 hhHtml=function(){return _hh2().replace(/<\/div>$/,`<h3 class="sec">Datenquellen</h3><p class="note" style="margin-top:0">Gescannte Produkte: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL). Die Werte beim Schnell-Eintragen sind Durchschnittswerte und können abweichen.</p></div>`);};
+
+/* ===== Zusatz 6: Scan-Knopf unten rechts und Wischen zum Zurückgehen ===== */
+const ICSC='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2"/><path d="M8 8v8M11 8v8M14 8v8M17 8v8"/></svg>';
+const fab=document.createElement("button"); fab.id="fab"; fab.setAttribute("aria-label","Produkt scannen und prüfen, ob es noch ins Tagesziel passt");
+fab.innerHTML=ICSC+"<span>Scannen</span>"; document.body.appendChild(fab);
+fab.addEventListener("click",()=>{dyk=dkey(new Date());openScan();});
+
+/* Wischen vom linken oder rechten Rand schließt die oberste Ansicht (wie Zurück) */
+(function(){
+  let sx=0,sy=0,st=0,side=0;
+  const top=()=>!scn.hidden?"S":(!pnl.hidden?"P":(openId?"R":""));
+  document.addEventListener("touchstart",e=>{const t=e.touches[0];sx=t.clientX;sy=t.clientY;st=Date.now();side=sx<=36?1:(sx>=window.innerWidth-36?-1:0);},{passive:true});
+  document.addEventListener("touchend",e=>{
+    if(!side) return; const o=top(); if(!o) return;
+    const t=e.changedTouches[0], dx=(t.clientX-sx)*side, dy=Math.abs(t.clientY-sy);
+    side=0;
+    if(dx>70&&dy<70&&Date.now()-st<900){ if(o==="S") closeScan(); else if(o==="P") closePanel(); else closeRecipe(); }
+  },{passive:true});
+})();
+
+/* Tagebuch aufräumen: seltene Bereiche einklappen */
+const foldOpen={};
+const FOLD=["Rezept eintragen","Eigener Eintrag","Meine Lebensmittel","Letzte 7 Tage","Tagesziel"];
+const _dyH3=dyHtml;
+dyHtml=function(){
+  const parts=_dyH3().split('<h3 class="sec">');
+  let out=parts[0];
+  for(let i=1;i<parts.length;i++){
+    const p=parts[i], e=p.indexOf("</h3>"), title=p.slice(0,e); let body=p.slice(e+5), close="";
+    if(i===parts.length-1){const m=body.match(/\s*<\/div>\s*$/); if(m){close=m[0];body=body.slice(0,body.length-m[0].length);}}
+    if(FOLD.includes(title)) out+=`<details class="fold" data-k="${title}"${foldOpen[title]?" open":""}><summary>${title}</summary>${body}</details>`+close;
+    else out+='<h3 class="sec">'+title+"</h3>"+body+close;
+  }
+  return out;
+};
+document.addEventListener("toggle",ev=>{const d=ev.target;if(d&&d.classList&&d.classList.contains("fold"))foldOpen[d.dataset.k]=d.open;},true);
+
+/* Version und Neu laden in den Einstellungen, Scanner-Bibliothek vorab laden */
+const APPV="15.10.2026, Stand 4";
+const _hh3=hhHtml;
+hhHtml=function(){return _hh3().replace(/<\/div>$/,`<h3 class="sec">App</h3><p class="note" style="margin-top:0">Version ${APPV}</p><div class="stack"><button class="btn" data-reload>Neu laden</button></div></div>`);};
+document.addEventListener("click",ev=>{const t=ev.target.closest("button");if(t&&t.dataset.reload!==undefined)location.reload();});
+setTimeout(()=>{try{loadBD().catch(()=>{});}catch(e){}},5000);
 
 render();
 </script>
