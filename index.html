@@ -193,6 +193,8 @@ main{padding-bottom:70px}
 .scchk.ok b{color:var(--accent)}
 .scchk.over{background:rgba(217,119,6,.14);border:1px solid var(--warn)}
 .scchk.over b{color:var(--warn)}
+.undo{display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:10px 0}
+.undo span{min-width:0;font-size:15px}
 details.fold{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin:10px 0;padding:0 12px}
 details.fold>summary{min-height:48px;display:flex;align-items:center;font-family:var(--f-disp);font-size:18px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);cursor:pointer;list-style:none}
 details.fold>summary::-webkit-details-marker{display:none}
@@ -660,9 +662,9 @@ detailHtml=function(id){
 const DLS="kochplaner.diary.v1";
 let DY={goal:{k:2100,p:150},days:{},foods:[]};
 try{const o=JSON.parse(localStorage.getItem(DLS)); if(o&&o.days) DY=o;}catch(e){}
-const dsave=()=>{try{localStorage.setItem(DLS,JSON.stringify(DY))}catch(e){}};
+const dsave=()=>{DY.u=Date.now();try{localStorage.setItem(DLS,JSON.stringify(DY))}catch(e){} if(window.dHook) window.dHook();};
 const dkey=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
-let dyk=dkey(new Date()), dyq="";
+let dyk=dkey(new Date()), dyq="", UNDO=null;
 const dlabel=k=>{const t=dkey(new Date());if(k===t)return"Heute";const y=new Date();y.setDate(y.getDate()-1);if(k===dkey(y))return"Gestern";const [a,b,c]=k.split("-");return c+"."+b+"."+a;};
 const f1=n=>String(Math.round(n*10)/10).replace(".",",");
 function tot(k){const e=DY.days[k]||[];return{k:e.reduce((a,x)=>a+x.k*x.m,0),p:e.reduce((a,x)=>a+x.p*x.m,0)};}
@@ -701,7 +703,7 @@ function dyHtml(){
   </div>`;
 }
 function drawDy(keep){const y=pnl.scrollTop;pnl.innerHTML=dyHtml();pnl.scrollTop=keep?y:0;}
-function openDy(){pm="Y";dyq="";dyk=dkey(new Date());drawDy(false);pnl.hidden=false;}
+function openDy(){pm="Y";dyq="";UNDO=null;dyk=dkey(new Date());drawDy(false);pnl.hidden=false;}
 
 /* ---------- Haushalt und Live-Abgleich ---------- */
 const HK="kochplaner.hh";
@@ -709,7 +711,7 @@ let HH=null; try{HH=JSON.parse(localStorage.getItem(HK));}catch(e){}
 const hsave=()=>{try{localStorage.setItem(HK,JSON.stringify(HH))}catch(e){}};
 const hm=(location.hash||"").match(/h=([a-z0-9]{16,64})/i);
 if(hm){HH={mode:"cloud",code:hm[1].toLowerCase()};hsave();try{history.replaceState(null,"",location.pathname+location.search);}catch(e){}}
-const SH=["sel","sc","fr","cust","done","offers"];
+const SH=["sel","sc","fr","cust","done","offers","week"];
 let fbRef=null,unsub=null,last={},syncState="off",ready=false;
 const SYK="kochplaner.sync.v1";
 const saveLast=()=>{try{localStorage.setItem(SYK,JSON.stringify(last))}catch(e){}};
@@ -788,7 +790,8 @@ document.addEventListener("click",ev=>{
     if(d.dyd){const x=new Date(dyk+"T12:00:00");x.setDate(x.getDate()+parseInt(d.dyd));if(dkey(x)<=dkey(new Date())){dyk=dkey(x);drawDy(false);}return}
     if(d.dyr){const r=all[d.dyr];addEntry({n:r.n,k:r.k,p:r.p,rid:r.id});dyq="";drawDy(true);toast("Eingetragen");return}
     if(d.dym){const [i,s]=d.dym.split(":");const e=DY.days[dyk][+i];e.m=Math.max(0.5,e.m+parseFloat(s));dsave();drawDy(true);return}
-    if(d.dyx){DY.days[dyk].splice(+d.dyx,1);dsave();drawDy(true);return}
+    if(d.dyx){UNDO={k:dyk,i:+d.dyx,e:DY.days[dyk][+d.dyx]};DY.days[dyk].splice(+d.dyx,1);dsave();drawDy(true);return}
+    if(d.dyundo!==undefined&&UNDO){const a=DY.days[UNDO.k]||(DY.days[UNDO.k]=[]);a.splice(Math.min(UNDO.i,a.length),0,UNDO.e);UNDO=null;dsave();drawDy(true);toast("Wiederhergestellt");return}
     if(d.dyown!==undefined){const n=$("#dy-n").value.trim(),k=parseFloat($("#dy-k").value.replace(",","."))||0,p=parseFloat($("#dy-p").value.replace(",","."))||0;
       if(!n){toast("Bitte einen Namen eintragen");return} if(k<=0&&p<=0){toast("Bitte kcal eintragen");return}
       addEntry({n,k,p}); if($("#dy-s").checked&&!DY.foods.some(f=>f.n.toLowerCase()===n.toLowerCase())){DY.foods.push({n,k,p});dsave();} drawDy(true);toast("Eingetragen");return}
@@ -1151,6 +1154,51 @@ document.addEventListener("click",ev=>{
   if(d.qadd!==undefined){let n=0;QP.forEach(pc=>{const c=calcPiece(pc);if(c){addEntry({n:c.f.n+" ("+c.label+")",k:c.k,p:c.p});n++;}});QP=[];drawDy(true);toast(n+" Eintrag"+(n>1?"e":"")+" gespeichert");return}
 });
 
+/* ===== Zusatz 9: Eigenes Rezept, kcal, Eiweiß und Zeit ungefähr automatisch berechnen ===== */
+const SKIPZ=/salz|pfeffer|gewuerz|gewürz|wasser|paprikapulver|oregano|chili|kraeuter|kräuter|knoblauchpulver|zwiebelpulver|kreuzkuemmel|kreuzkümmel|zimt|muskat|petersilie|schnittlauch|dill|basilikum/i;
+function estimateRecipe(zLines,sLines){
+  let k=0,p=0,found=0; const unknown=[];
+  zLines.forEach(line=>String(line).split(/\s*,\s+(?=[\d½])/).forEach(part=>{
+    if(!part.trim()) return;
+    const pc=parsePiece(part);
+    if(!pc||!pc.foods.length){ if(!SKIPZ.test(part)) unknown.push(part.trim()); return; }
+    pc.fi=0; const c=calcPiece(pc); if(!c){ unknown.push(part.trim()); return; }
+    let f=1,fp=1; const t=nm(part), fn=c.f.n.toLowerCase();
+    if(!/gekocht|gegart|gebraten|fertig/.test(t)){
+      if(/(reis|nudel|pasta|couscous|spaghetti|linsen|bulgur|kidney|kichererbsen)/.test(fn)&&/gekocht/.test(fn)){f=fp=2.7;}
+      else if(/(gegart|gebraten)/.test(fn)){f=0.7;fp=0.75;}
+    }
+    k+=c.k*f; p+=c.p*fp; found++;
+  }));
+  let mins=0, any=false;
+  sLines.forEach(s=>{const m=String(s).match(/(\d+)\s*(?:–|-)\s*(\d+)\s*Min/)||String(s).match(/(\d+)\s*Min/); if(m){mins+=parseInt(m[2]||m[1]);any=true;}});
+  let t=any?mins+5+Math.ceil(zLines.length/3):10+5*sLines.length;
+  t=Math.max(10,Math.round(t/5)*5);
+  return {k:Math.round(k/2),p:Math.round(p/2),t:"ca. "+t+" Min",unknown,found};
+}
+const crLines=id=>($(id)||{value:""}).value.split(String.fromCharCode(10)).map(x=>x.trim()).filter(Boolean);
+const _crH2=crHtml;
+crHtml=function(id){
+  return _crH2(id).replace('placeholder="600"','placeholder="automatisch"').replace('placeholder="45"','placeholder="automatisch"').replace('placeholder="25 Min"','placeholder="automatisch"')
+   .replace('<div class="stack"><button class="btn pri" data-crsave=','<div class="stack"><button class="btn" data-crcalc>Kalorien, Eiweiß und Zeit berechnen</button><p class="note" id="crhint" style="margin:0">Nur ungefähre Werte. Lässt du die Felder leer, rechnet die App beim Speichern selbst.</p><button class="btn pri" data-crsave=');
+};
+const _saveCr2=saveCr;
+saveCr=function(id){
+  const kE=$("#cr-k"),pE=$("#cr-p"),tE=$("#cr-t");
+  if(kE&&pE&&tE&&(!kE.value.trim()||!pE.value.trim()||!tE.value.trim())){
+    const e=estimateRecipe(crLines("#cr-z"),crLines("#cr-s"));
+    if(!kE.value.trim()) kE.value=e.k; if(!pE.value.trim()) pE.value=e.p; if(!tE.value.trim()) tE.value=e.t;
+  }
+  _saveCr2(id);
+};
+document.addEventListener("click",ev=>{
+  const t=ev.target.closest("button"); if(!t||t.dataset.crcalc===undefined) return;
+  const z=crLines("#cr-z"); if(!z.length){toast("Trag zuerst die Zutaten ein");return}
+  const e=estimateRecipe(z,crLines("#cr-s"));
+  $("#cr-k").value=e.k; $("#cr-p").value=e.p; $("#cr-t").value=e.t;
+  const h=$("#crhint"); if(h) h.textContent="Ungefähr "+e.k+" kcal und "+e.p+" g Eiweiß pro Person."+(e.unknown.length?" Nicht erkannt, deshalb nicht mitgerechnet: "+e.unknown.join(", ")+". Du kannst die Werte jederzeit selbst ändern.":" Du kannst die Werte jederzeit selbst ändern.");
+});
+
 /* ===== Zusatz 4: Barcode-Scanner mit Open Food Facts ===== */
 const OFFK="kochplaner.off.v1";
 let OFFC={}; try{OFFC=JSON.parse(localStorage.getItem(OFFK))||{};}catch(e){}
@@ -1304,6 +1352,77 @@ document.addEventListener("click",ev=>{
 const _hh2=hhHtml;
 hhHtml=function(){return _hh2().replace(/<\/div>$/,`<h3 class="sec">Datenquellen</h3><p class="note" style="margin-top:0">Gescannte Produkte: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL). Die Werte beim Schnell-Eintragen sind Durchschnittswerte und können abweichen.</p></div>`);};
 
+/* ===== Zusatz 7: Tagebuch-Cloud-Sicherung (persönlicher Code) und Rückgängig-Leiste ===== */
+const DCK="kochplaner.dc", DSK="kochplaner.dsync";
+let DC=null; try{DC=localStorage.getItem(DCK);}catch(e){}
+let dls=0; try{dls=parseInt(localStorage.getItem(DSK))||0;}catch(e){}
+let dRef=null,dUnsub=null,dReady=false,dSaving=false,dDirty=false,dTimer=null,dState="off",dcShow=false;
+const dSetSync=u=>{dls=u;try{localStorage.setItem(DSK,String(u));}catch(e){}};
+const dLocalSave=()=>{try{localStorage.setItem(DLS,JSON.stringify(DY));}catch(e){}};
+function dMerge(r){
+  Object.keys(r.days||{}).forEach(k=>{if(!DY.days[k]) DY.days[k]=r.days[k];});
+  (r.foods||[]).forEach(f=>{if(!DY.foods.some(x=>x.n.toLowerCase()===f.n.toLowerCase())) DY.foods.push(f);});
+}
+function dStop(){if(dUnsub){dUnsub();dUnsub=null;}dRef=null;dReady=false;dState="off";}
+function dStart(){
+  if(!window.FB||!DC||DC.length<16) return; dStop();
+  dRef=FB.doc(FB.db,"diaries",DC);
+  dUnsub=FB.onSnapshot(dRef,snap=>{
+    if(snap.metadata.hasPendingWrites) return;
+    if(snap.metadata.fromCache&&!snap.exists()) return;
+    dState=snap.metadata.fromCache?"off":"online";
+    if(!snap.exists()){dReady=true;dPush(true);return}
+    let r; try{r=JSON.parse(snap.data().dyS);}catch(e){return}
+    const ru=snap.data().u||0, lu=DY.u||0;
+    if(ru>dls&&lu<=dls){
+      DY=Object.assign({goal:{k:2100,p:150},days:{},foods:[]},r); DY.u=ru; dLocalSave(); dSetSync(ru);
+      const a=document.activeElement; if(pm==="Y"&&!pnl.hidden&&!(a&&(a.tagName==="INPUT"||a.tagName==="TEXTAREA"))) drawDy(true);
+    }else if(lu>dls){
+      dMerge(r); DY.u=Date.now(); dLocalSave(); dReady=true; dPush(true);
+    }
+    dReady=true;
+  },()=>{dState="error";});
+}
+function dPush(force){
+  if(!dRef||!dReady) return;
+  if(dSaving){dDirty=true;return}
+  const u=DY.u||0; if(!force&&u<=dls) return;
+  dSaving=true;
+  FB.setDoc(dRef,{dyS:JSON.stringify(DY),u}).then(()=>{dSetSync(u);dState="online";}).catch(()=>{dState="error";}).finally(()=>{dSaving=false;if(dDirty){dDirty=false;dPush(false);}});
+}
+window.dHook=()=>{clearTimeout(dTimer);dTimer=setTimeout(()=>dPush(false),1200);};
+if(window.FB) dStart(); else window.addEventListener("fb",dStart);
+
+function dcHtml(){
+  const st=dState==="online"?"Verbunden, alles gesichert.":dState==="error"?"Verbindung gestört, wird später gesichert.":"Wird gesichert, sobald eine Verbindung besteht.";
+  return `<h3 class="sec">Tagebuch sichern</h3>`+(DC?
+   `<p class="note" style="margin-top:0">Dein Tagebuch wird automatisch in der Cloud gesichert, geschützt durch deinen eigenen Code. ${st}</p>
+    <div class="code">${dcShow?esc(DC):"••••••••••••••••••••"}</div>
+    <div class="stack"><button class="btn" data-dcshow>${dcShow?"Code verbergen":"Code anzeigen"}</button><button class="btn" data-dccopy>Code kopieren</button><button class="btn warn" id="dcoff">Sicherung beenden</button></div>
+    <p class="note">Schreib dir den Code auf oder mach ein Foto. Ohne ihn kommst du auf einem neuen Handy nicht an dein Tagebuch.</p>`
+   :`<p class="note" style="margin-top:0">Bisher liegt dein Tagebuch nur auf diesem Handy. Mit einer Sicherung geht es auch auf einem neuen Handy weiter.</p>
+    <div class="stack"><button class="btn pri" data-dcnew>In der Cloud sichern</button></div>
+    <input id="dc-c" class="finp" placeholder="Oder Code zum Wiederherstellen einfügen" autocapitalize="none" autocomplete="off" style="margin-top:10px">
+    <div class="stack"><button class="btn" data-dcjoin>Wiederherstellen</button></div>`);
+}
+const _hh4=hhHtml;
+hhHtml=function(){return _hh4().replace('<h3 class="sec">Datenquellen</h3>',dcHtml()+'<h3 class="sec">Datenquellen</h3>');};
+const _dyH4=dyHtml;
+dyHtml=function(){
+  let h=_dyH4();
+  if(UNDO) h=h.replace('<h3 class="sec">Gegessen</h3>',`<div class="undo"><span>Gelöscht: ${esc(UNDO.e.n)}</span><button class="btn" data-dyundo>Rückgängig</button></div><h3 class="sec">Gegessen</h3>`);
+  return h;
+};
+document.addEventListener("click",ev=>{
+  const t=ev.target.closest("button"); if(!t||pm!=="H"||pnl.hidden) return; const d=t.dataset;
+  if(d.dcnew!==undefined){DC=newCode();try{localStorage.setItem(DCK,DC);}catch(e){}dSetSync(0);dcShow=true;if(!window.FB)toast("Keine Verbindung, der Code ist gespeichert");dStart();openHh();return}
+  if(d.dcjoin!==undefined){const m=($("#dc-c")||{value:""}).value.match(/([a-z0-9]{16,64})\s*$/i);if(!m){toast("Das ist kein gültiger Code");return}
+    DC=m[1].toLowerCase();try{localStorage.setItem(DCK,DC);}catch(e){}dSetSync(0);dcShow=false;dStart();openHh();toast("Wird wiederhergestellt");return}
+  if(d.dcshow!==undefined){dcShow=!dcShow;openHh();return}
+  if(d.dccopy!==undefined){copyTxt(DC);return}
+  if(t.id==="dcoff"){ if(t.dataset.c){dStop();DC=null;try{localStorage.removeItem(DCK);localStorage.removeItem(DSK);}catch(e){}dls=0;openHh();toast("Sicherung beendet")} else {t.dataset.c=1;t.textContent="Wirklich beenden?";setTimeout(()=>{if(t.isConnected){delete t.dataset.c;t.textContent="Sicherung beenden"}},3500)} return}
+});
+
 /* ===== Zusatz 6: Scan-Knopf unten rechts und Wischen zum Zurückgehen ===== */
 const ICSC='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2"/><path d="M8 8v8M11 8v8M14 8v8M17 8v8"/></svg>';
 const fab=document.createElement("button"); fab.id="fab"; fab.setAttribute("aria-label","Produkt scannen und prüfen, ob es noch ins Tagesziel passt");
@@ -1341,11 +1460,65 @@ dyHtml=function(){
 document.addEventListener("toggle",ev=>{const d=ev.target;if(d&&d.classList&&d.classList.contains("fold"))foldOpen[d.dataset.k]=d.open;},true);
 
 /* Version und Neu laden in den Einstellungen, Scanner-Bibliothek vorab laden */
-const APPV="15.10.2026, Stand 4";
+const APPV="15.10.2026, Stand 5";
 const _hh3=hhHtml;
 hhHtml=function(){return _hh3().replace(/<\/div>$/,`<h3 class="sec">App</h3><p class="note" style="margin-top:0">Version ${APPV}</p><div class="stack"><button class="btn" data-reload>Neu laden</button></div></div>`);};
 document.addEventListener("click",ev=>{const t=ev.target.closest("button");if(t&&t.dataset.reload!==undefined)location.reload();});
-setTimeout(()=>{try{loadBD().catch(()=>{});}catch(e){}},5000);
+setTimeout(()=>{try{loadBD().then(()=>{const BD=(window.BarcodeDetectionAPI&&window.BarcodeDetectionAPI.BarcodeDetector)||window.BarcodeDetector;const c=document.createElement("canvas");c.width=c.height=16;return new BD({formats:["ean_13"]}).detect(c);}).catch(()=>{});}catch(e){}},5000);
+if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="127.0.0.1"||location.hostname==="localhost")) window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{});});
+
+/* ===== Zusatz 8: Wochenplan (optional, ausklappbar) ===== */
+if(!ST.week||typeof ST.week!=="object"||Array.isArray(ST.week)) ST.week={};
+const WD=[["Mo","Montag"],["Di","Dienstag"],["Mi","Mittwoch"],["Do","Donnerstag"],["Fr","Freitag"],["Sa","Samstag"],["So","Sonntag"]];
+const WS=[["F","Frühstück","Frühstück"],["M","Mittag","Snack & Beilage"],["H","Hauptmahlzeit","Hauptmahlzeit"],["A","Abend","Snack & Beilage"]];
+let wkSel=null, wkq="", wkg="Alle";
+function weekBlock(){
+  const wk=ST.week||{}; let n=0;
+  const days=WD.map(([k,name])=>{
+    const rows=WS.map(([s,sn])=>{const id=(wk[k]||{})[s], r=id&&all[id]; if(r) n++;
+      return `<button class="ck" data-wk="${k}:${s}" style="grid-template-columns:96px 1fr;min-height:48px"><span class="l" style="color:var(--muted);font-size:14px">${sn}</span><span class="l" style="${r?"":"color:var(--muted)"}">${r?esc(r.n):"+ auswählen"}</span></button>`}).join("");
+    return `<h4 style="margin:12px 0 4px;font-family:var(--f-disp);font-size:19px;letter-spacing:.03em">${name}</h4><div class="box">${rows}</div>`;
+  }).join("");
+  return `<details class="fold" data-k="Wochenplan"${foldOpen["Wochenplan"]?" open":""}><summary>Wochenplan (optional)</summary>
+   <p class="note" style="margin:0 0 4px">Lege fest, was an welchem Tag gegessen wird. Mit dem Knopf unten landen alle Gerichte im Plan und in der Einkaufsliste.</p>
+   ${days}
+   <div class="stack"><button class="btn pri" data-wkapply>${n?"In Plan und Einkauf übernehmen ("+n+")":"In Plan und Einkauf übernehmen"}</button><button class="btn warn" id="wkclr">Woche leeren</button></div></details>`;
+}
+const _pl2=planHtml;
+planHtml=function(){return _pl2()+weekBlock();};
+
+function wkListHtml(){
+  const q=wkq.trim().toLowerCase();
+  const rows=ALL.filter(r=>(wkg==="Alle"||grp(r)===wkg)&&(!q||(r.n+" "+r.id).toLowerCase().includes(q)));
+  if(!rows.length) return '<p class="empty">Kein Rezept gefunden.</p>';
+  return rows.map(r=>`<div class="rc" style="grid-template-columns:1fr"><button class="rb" data-wkpick="${r.id}"><span class="top"><span class="id">${r.id}</span><b>${esc(r.n)}</b></span><span class="meta">${metaOf(r)}</span></button></div>`).join("");
+}
+function wkHtml(){
+  const day=WD.find(x=>x[0]===wkSel.d)[1], sl=WS.find(x=>x[0]===wkSel.s)[1], cur=((ST.week[wkSel.d]||{})[wkSel.s]);
+  return `<div class="dtop"><div class="in"><button class="back" data-pc>Abbrechen</button></div></div>
+  <div class="dbody"><h2>${day}: ${sl}</h2>
+  <input id="wkq" class="finp" type="search" placeholder="Rezept suchen" value="${esc(wkq)}" aria-label="Rezept suchen">
+  <div class="chips" id="wkc">${["Alle"].concat(Object.keys(CGRP)).map(g=>`<button data-wkg="${g}" aria-pressed="${g===wkg}">${g}</button>`).join("")}</div>
+  ${cur?`<div class="stack"><button class="btn warn" data-wkempty>Aus diesem Platz entfernen</button></div>`:""}
+  <div id="wkl" style="margin-top:10px">${wkListHtml()}</div></div>`;
+}
+function openWk(d,s){wkSel={d,s};wkq="";wkg=WS.find(x=>x[0]===s)[2];pm="W";pnl.innerHTML=wkHtml();pnl.hidden=false;pnl.scrollTop=0;}
+document.addEventListener("click",ev=>{
+  const t=ev.target.closest("button"); if(!t) return; const d=t.dataset;
+  if(d.wk&&tab==="P"){const [a,b]=d.wk.split(":");openWk(a,b);return}
+  if(d.wkapply!==undefined){
+    const cnt={}; Object.keys(ST.week).forEach(k=>Object.keys(ST.week[k]||{}).forEach(s=>{const id=ST.week[k][s];if(id&&all[id])cnt[id]=(cnt[id]||0)+1;}));
+    const ids=Object.keys(cnt); if(!ids.length){toast("Der Wochenplan ist noch leer");return}
+    ids.forEach(id=>{ST.sel[id]=Math.min(9,cnt[id]);}); persist(); render(); toast(ids.length+" Rezepte im Plan"); return;
+  }
+  if(t.id==="wkclr"){ if(t.dataset.c){ST.week={};persist();render();toast("Woche geleert")} else {t.dataset.c=1;t.textContent="Wirklich leeren?";setTimeout(()=>{if(t.isConnected){delete t.dataset.c;t.textContent="Woche leeren"}},3500)} return}
+  if(pm==="W"&&!pnl.hidden&&wkSel){
+    if(d.wkpick){const w=(ST.week[wkSel.d]||(ST.week[wkSel.d]={}));w[wkSel.s]=d.wkpick;persist();closePanel();return}
+    if(d.wkempty!==undefined){if(ST.week[wkSel.d])delete ST.week[wkSel.d][wkSel.s];persist();closePanel();return}
+    if(d.wkg){wkg=d.wkg;document.querySelectorAll("#wkc button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.wkg===wkg));$("#wkl").innerHTML=wkListHtml();return}
+  }
+});
+document.addEventListener("input",ev=>{if(ev.target.id==="wkq"){wkq=ev.target.value;$("#wkl").innerHTML=wkListHtml();}});
 
 render();
 </script>
