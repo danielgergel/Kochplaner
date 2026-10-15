@@ -193,6 +193,8 @@ main{padding-bottom:70px}
 .scchk.ok b{color:var(--accent)}
 .scchk.over{background:rgba(217,119,6,.14);border:1px solid var(--warn)}
 .scchk.over b{color:var(--warn)}
+.pkg{display:flex;flex-wrap:wrap;gap:6px}
+.pkg button{min-height:44px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);font-weight:600;font-size:15px}
 .stars{display:flex;align-items:center;gap:2px;margin:6px 0 2px}
 .stars button{width:46px;height:46px;border:0;background:none;font-size:30px;line-height:1;color:var(--muted);padding:0}
 .stars button[aria-pressed="true"]{color:var(--warn)}
@@ -372,7 +374,7 @@ let ALL=Object.values(all).sort((a,b)=>a.id[0]===b.id[0]?parseInt(a.id.slice(1))
 const PACK={"Rinderhack (mager)":400,"Hähnchenbrust":400,"Skyr":500,"Magerquark":500,"Putenschnitzel":400};
 const NSVIDEO="data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAMybW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAB9AAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAl10cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAB9AAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAACAAAAAgAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAfQAAAAAAABAAAAAAHVbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAABAAAAAgABVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAABgG1pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAUBzdGJsAAAAuHN0c2QAAAAAAAAAAQAAAKhhdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAACAAIABIAAAASAAAAAAAAAABFExhdmM2My4xLjEwMSBsaWJ4MjY0AAAAAAAAAAAAAAAAGP//AAAALmF2Y0MBQsAK/+EAFmdCwArZCWwEQAAAAwBAAAADAQPEiZIBAAVoy4PLIAAAABBwYXNwAAAAAQAAAAEAAAAUYnRydAAAAAAAAAqMAAAAAAAAABhzdHRzAAAAAAAAAAEAAAAEAAAgAAAAABRzdHNzAAAAAAAAAAEAAAABAAAAHHN0c2MAAAAAAAAAAQAAAAEAAAAEAAAAAQAAACRzdHN6AAAAAAAAAAAAAAAEAAAChQAAAAoAAAAKAAAACgAAABRzdGNvAAAAAAAAAAEAAANiAAAAYXVkdGEAAABZbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcmFwcGwAAAAAAAAAAAAAAAAsaWxzdAAAACSpdG9vAAAAHGRhdGEAAAABAAAAAExhdmY2My4xLjEwMQAAAAhmcmVlAAACq21kYXQAAAJwBgX//2zcRem95tlIt5Ys2CDZI+7veDI2NCAtIGNvcmUgMTY1IHIzMjIzIDA0ODBjYjAgLSBILjI2NC9NUEVHLTQgQVZDIGNvZGVjIC0gQ29weWxlZnQgMjAwMy0yMDI1IC0gaHR0cDovL3d3dy52aWRlb2xhbi5vcmcveDI2NC5odG1sIC0gb3B0aW9uczogY2FiYWM9MCByZWY9MyBkZWJsb2NrPTE6MDowIGFuYWx5c2U9MHgxOjB4MTExIG1lPWhleCBzdWJtZT03IHBzeT0xIHBzeV9yZD0xLjAwOjAuMDAgbWl4ZWRfcmVmPTEgbWVfcmFuZ2U9MTYgY2hyb21hX21lPTEgdHJlbGxpcz0xIDh4OGRjdD0wIGNxbT0wIGRlYWR6b25lPTIxLDExIGZhc3RfcHNraXA9MSBjaHJvbWFfcXBfb2Zmc2V0PS0yIHRocmVhZHM9MSBsb29rYWhlYWRfdGhyZWFkcz0xIHNsaWNlZF90aHJlYWRzPTAgbnI9MCBkZWNpbWF0ZT0xIGludGVybGFjZWQ9MCBibHVyYXlfY29tcGF0PTAgY29uc3RyYWluZWRfaW50cmE9MCBiZnJhbWVzPTAgd2VpZ2h0cD0wIGtleWludD0yNTAga2V5aW50X21pbj0yIHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAADWWIhAU8mKAAP78nXXgAAAAGQZo4CnlgAAAABkGaVAKeWAAAAAZBmmAS8sA=";
 const $=s=>document.querySelector(s);
-const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const LS="kochplaner.v1";
 let ST={v:1,u:0,sel:{},sc:{},rc:{}};
 let tab="R", fq="", fg="Alle", openId=null;
@@ -651,7 +653,7 @@ function saveCr(id){
   const lines=s=>$(s).value.split("\n").map(x=>x.trim()).filter(Boolean);
   const z=lines("#cr-z"), s=lines("#cr-s"); if(!z.length){toast("Bitte Zutaten eintragen");return}
   const num=v=>Math.max(0,Math.round(parseFloat(String(v).replace(",","."))||0));
-  const rec={id:id||("X"+(1+Math.max(0,...ST.cust.map(c=>parseInt(c.id.slice(1)))))),n,c:CGRP[$("#cr-g").value],k:num($("#cr-k").value),p:num($("#cr-p").value),t:$("#cr-t").value.trim()||"–",z,s:s.length?s:["Nach Belieben zubereiten."],ns:true,pt:"für 2 Personen",cust:1};
+  const rec={id:id||("X"+Date.now()),n,c:CGRP[$("#cr-g").value],k:num($("#cr-k").value),p:num($("#cr-p").value),t:$("#cr-t").value.trim()||"–",z,s:s.length?s:["Nach Belieben zubereiten."],ns:true,pt:"für 2 Personen",cust:1};
   const i=ST.cust.findIndex(c=>c.id===rec.id); if(i>=0) ST.cust[i]=rec; else ST.cust.push(rec);
   rebuildAll(); persist(); closePanel(); if(openId) redrawDetail(); toast("Rezept gespeichert");
 }
@@ -667,7 +669,7 @@ detailHtml=function(id){
 /* ---------- Tagebuch (persönlich, nur auf diesem Handy) ---------- */
 const DLS="kochplaner.diary.v1";
 let DY={goal:{k:2100,p:150},days:{},foods:[]};
-try{const o=JSON.parse(localStorage.getItem(DLS)); if(o&&o.days) DY=o;}catch(e){}
+try{const o=JSON.parse(localStorage.getItem(DLS)); if(o&&o.days) DY=Object.assign({goal:{k:2100,p:150},days:{},foods:[]},o);}catch(e){}
 const dsave=()=>{DY.u=Date.now();try{localStorage.setItem(DLS,JSON.stringify(DY))}catch(e){} if(window.dHook) window.dHook();};
 const dkey=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 let dyk=dkey(new Date()), dyq="", UNDO=null;
@@ -708,7 +710,7 @@ function dyHtml(){
   <div class="frm"><label>kcal<input id="dg-k" inputmode="numeric" value="${G.k}"></label><label>Eiweiß (g)<input id="dg-p" inputmode="numeric" value="${G.p}"></label></div>
   </div>`;
 }
-function drawDy(keep){const y=pnl.scrollTop;pnl.innerHTML=dyHtml();pnl.scrollTop=keep?y:0;}
+function drawDy(keep){try{QP=[];}catch(e){}const y=pnl.scrollTop;pnl.innerHTML=dyHtml();pnl.scrollTop=keep?y:0;}
 function openDy(){pm="Y";dyq="";UNDO=null;dyk=dkey(new Date());drawDy(false);pnl.hidden=false;}
 
 /* ---------- Haushalt und Live-Abgleich ---------- */
@@ -716,7 +718,8 @@ const HK="kochplaner.hh";
 let HH=null; try{HH=JSON.parse(localStorage.getItem(HK));}catch(e){}
 const hsave=()=>{try{localStorage.setItem(HK,JSON.stringify(HH))}catch(e){}};
 const hm=(location.hash||"").match(/h=([a-z0-9]{16,64})/i);
-if(hm){HH={mode:"cloud",code:hm[1].toLowerCase()};hsave();try{history.replaceState(null,"",location.pathname+location.search);}catch(e){}}
+var joinMode=false;
+if(hm){const oc=HH&&HH.code;HH={mode:"cloud",code:hm[1].toLowerCase()};if(oc!==HH.code){try{localStorage.removeItem("kochplaner.sync.v1");}catch(e){}joinMode=true;}hsave();try{history.replaceState(null,"",location.pathname+location.search);}catch(e){}}
 const SH=["sel","sc","fr","cust","done","offers","week","rate"];
 let fbRef=null,unsub=null,last={},syncState="off",ready=false;
 const SYK="kochplaner.sync.v1";
@@ -730,7 +733,10 @@ function startSync(){
   unsub=FB.onSnapshot(fbRef,snap=>{
     if(snap.metadata.hasPendingWrites) return;
     syncState=snap.metadata.fromCache?"off":"online"; chip();
-    if(!snap.exists()){if(!snap.metadata.fromCache){ready=true;pushShared(true);}return}
+    if(!snap.exists()){if(!snap.metadata.fromCache){
+      if(joinMode){joinMode=false;HH={mode:"local"};hsave();stopSync();toast("Diesen Haushalt gibt es nicht. Bitte den Code prüfen.");if(pm==="H"&&!pnl.hidden)openHh();return}
+      ready=true;pushShared(true);}return}
+    joinMode=false;
     applyRemote(snap.data());
     if(!snap.metadata.fromCache){ready=true;pushShared(false);}
   },()=>{syncState="error";chip();});
@@ -775,7 +781,7 @@ function hhHtml(){
    <div class="stack"><button class="btn" data-hhjoin>Beitreten</button><button class="btn" data-hhlocal>Nur auf diesem Handy nutzen</button></div>`)+`</div>`;
 }
 function openHh(){pm="H";pnl.innerHTML=hhHtml();pnl.hidden=false;pnl.scrollTop=0;}
-function setHH(code){HH={mode:"cloud",code};hsave();startSync();if(!window.FB)toast("Keine Verbindung, Code ist gespeichert");openHh();}
+function setHH(code,join){HH={mode:"cloud",code};hsave();joinMode=!!join;try{localStorage.removeItem(SYK);}catch(e){}startSync();if(!window.FB)toast("Keine Verbindung, Code ist gespeichert");openHh();}
 
 /* ---------- Eingaben ---------- */
 function copyTxt(s){try{navigator.clipboard.writeText(s).then(()=>toast("Kopiert"),()=>toast("Bitte lange auf den Code tippen und kopieren"))}catch(e){toast("Bitte lange auf den Code tippen und kopieren")}}
@@ -804,11 +810,11 @@ document.addEventListener("click",ev=>{
   }
   if(pm==="H"&&!pnl.hidden){
     if(d.hhnew!==undefined){setHH(newCode());return}
-    if(d.hhjoin!==undefined){const m=$("#hh-c").value.match(/([a-z0-9]{16,64})\s*$/i);if(!m){toast("Das ist kein gültiger Code");return}setHH(m[1].toLowerCase());return}
+    if(d.hhjoin!==undefined){const m=$("#hh-c").value.match(/([a-z0-9]{16,64})\s*$/i);if(!m){toast("Das ist kein gültiger Code");return}setHH(m[1].toLowerCase(),true);return}
     if(d.hhlocal!==undefined){HH={mode:"local"};hsave();closePanel();return}
     if(d.hhshare!==undefined){const u=hhUrl();if(navigator.share){navigator.share({title:"Kochplaner",text:"Unser gemeinsamer Kochplaner:",url:u}).catch(()=>{})}else copyTxt(u);return}
     if(d.hhcopy!==undefined){copyTxt(HH.code);return}
-    if(t.id==="hhleave"){ if(t.dataset.c){stopSync();HH={mode:"local"};hsave();openHh();toast("Haushalt verlassen")} else {t.dataset.c=1;t.textContent="Wirklich verlassen?";setTimeout(()=>{if(t.isConnected){delete t.dataset.c;t.textContent="Haushalt verlassen"}},3500)} return}
+    if(t.id==="hhleave"){ if(t.dataset.c){stopSync();HH={mode:"local"};hsave();try{localStorage.removeItem(SYK);}catch(e){}openHh();toast("Haushalt verlassen")} else {t.dataset.c=1;t.textContent="Wirklich verlassen?";setTimeout(()=>{if(t.isConnected){delete t.dataset.c;t.textContent="Haushalt verlassen"}},3500)} return}
   }
 });
 document.addEventListener("input",ev=>{
@@ -824,7 +830,7 @@ if(!HH) setTimeout(openHh,400);
 
 /* ---------- Plan mit Gekocht-Status ---------- */
 planHtml=function(){
-  const dn=ST.done||(ST.done={}); Object.keys(dn).forEach(k=>{if(!ST.sel[k])delete dn[k];});
+  const dn=ST.done||(ST.done={}); let dch=0; Object.keys(dn).forEach(k=>{if(!ST.sel[k]){delete dn[k];dch=1;}}); if(dch) persist();
   const ids=Object.keys(ST.sel);
   if(!ids.length) return '<p class="empty">Noch nichts im Plan. Tippe bei den Rezepten auf das Plus, zum Beispiel für zwei Gerichte über zwei Tage. Daraus entsteht deine Einkaufsliste.</p>';
   const n=ids.reduce((a,i)=>a+ST.sel[i],0), nd=ids.filter(i=>dn[i]).length;
@@ -1077,9 +1083,9 @@ const FOODDB=[
 ];
 
 /* ===== Zusatz 3: Schnell eintragen (Text -> kcal und Eiweiß) ===== */
-const NUMW={ein:1,eine:1,einen:1,einem:1,zwei:2,drei:3,vier:4,fuenf:5,sechs:6,sieben:7,acht:8,neun:9,zehn:10,halb:0.5,halbe:0.5,halben:0.5};
+const NUMW={ein:1,eine:1,einen:1,einem:1,zwei:2,drei:3,vier:4,fuenf:5,sechs:6,sieben:7,acht:8,neun:9,zehn:10,halb:0.5,halbe:0.5,halben:0.5,halbes:0.5,halber:0.5};
 const GUNIT={g:1,gr:1,gramm:1,kg:1000,ml:1,l:1000,liter:1000,el:12,tl:4};
-const nm=s=>String(s).toLowerCase().replace(/ß/g,"ss").replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/[^a-z0-9% ]/g," ").replace(/\s+/g," ").trim();
+const nm=s=>String(s).replace(/½/g," 0.5 ").toLowerCase().replace(/ß/g,"ss").replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/[^a-z0-9%. ]/g," ").replace(/\.(?!\d)/g," ").replace(/(^|\D)\./g,"$1 ").replace(/\s+/g," ").trim();
 FOODDB.forEach(f=>{f._a=[nm(f.n)].concat(f.a.map(nm));f._u=f.u.map(x=>[nm(x[0]),x[1],x[0]]);});
 const stripPl=w=>w.replace(/(en|n|e|s)$/,"");
 function scoreFood(f,q){
@@ -1116,6 +1122,7 @@ function calcPiece(pc){
   const fmtq=x=>String(Math.round(x*10)/10).replace(".",",");
   if(pc.unit&&GUNIT[pc.unit]!==undefined&&!["el","tl"].includes(pc.unit)){g=pc.n*GUNIT[pc.unit];label=fmtq(pc.n)+" "+pc.unit;}
   else if(pc.unit==="el"||pc.unit==="tl"){g=pc.n*GUNIT[pc.unit];label=fmtq(pc.n)+" "+pc.unit.toUpperCase();}
+  else if(!pc.unit&&pc.hasN&&pc.n>=20){g=pc.n;label=fmtq(g)+" g";}
   else{
     let u=null; if(pc.unit){u=f._u.find(x=>x[0]===pc.unit||stripPl(x[0])===stripPl(pc.unit));}
     if(!u) u=f._u.find(x=>x[2]!=="g"&&x[2]!=="ml")||f._u[0];
@@ -1126,7 +1133,7 @@ function calcPiece(pc){
 }
 let QP=[];
 function qParse(text){
-  QP=text.split(/\s*(?:,|\+|&|\bund\b|\bplus\b|\bmit\b)\s*/i).map(parsePiece).filter(Boolean);
+  QP=text.replace(/(\d),(\d)/g,"$1§$2").split(/\s*(?:,|\+|&|\bund\b|\bplus\b|\bmit\b)\s*/i).map(p=>parsePiece(p.replace(/§/g,","))).filter(Boolean);
 }
 function qHtml(){
   if(!QP.length) return "";
@@ -1142,7 +1149,7 @@ function qHtml(){
 }
 const _dyH2=dyHtml;
 dyHtml=function(){
-  return _dyH2().replace('<h3 class="sec">Gegessen</h3>',
+  return _dyH2().replace('<h3 class="sec">Gegessen</h3>',()=>
    `<h3 class="sec">Schnell eintragen</h3>
    <input id="qk" class="finp" placeholder="z. B. 4 Kaffee, 2 Brötchen mit Butter, Pommes" autocomplete="off" autocapitalize="none" aria-label="Was hast du gegessen oder getrunken?">
    <div id="qkp">${qHtml()}</div>
@@ -1207,7 +1214,7 @@ document.addEventListener("click",ev=>{
 const OFFK="kochplaner.off.v1";
 let OFFC={}; try{OFFC=JSON.parse(localStorage.getItem(OFFK))||{};}catch(e){}
 const scn=document.createElement("div"); scn.id="scn"; scn.hidden=true; document.body.appendChild(scn);
-let scnStream=null,scnRun=false,scnLoaded=null,SCP=null;
+let scnStream=null,scnRun=false,scnLoaded=null,SCP=null,scTok=0;
 function loadBD(){
   if(scnLoaded) return scnLoaded;
   scnLoaded=new Promise((res,rej)=>{
@@ -1218,21 +1225,24 @@ function loadBD(){
   return scnLoaded;
 }
 function stopCam(){scnRun=false;if(scnStream){scnStream.getTracks().forEach(t=>t.stop());scnStream=null;}}
-function closeScan(){stopCam();scn.hidden=true;scn.innerHTML="";}
+function closeScan(){scTok++;stopCam();scn.hidden=true;scn.innerHTML="";}
 function scanShell(inner){scn.innerHTML=`<div class="scbar"><button class="back" data-scx>Schließen</button></div><div class="scbody">${inner}</div>`;}
 async function openScan(){
-  scn.hidden=false;
+  const tok=++scTok; stopCam(); scn.hidden=false;
   scanShell(`<video id="scv" playsinline muted autoplay></video><p class="scs" id="scs">Kamera wird gestartet …</p>
    <div class="frm" style="margin-top:10px"><label class="full">Oder Nummer unter dem Barcode eintippen<input id="scm" inputmode="numeric" placeholder="4008400402222"></label><button class="btn full" data-scgo>Suchen</button></div>`);
   try{
-    scnStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},audio:false});
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},audio:false});
+    if(tok!==scTok||scn.hidden){stream.getTracks().forEach(t=>t.stop());return}
+    scnStream=stream;
     await loadBD();
+    if(tok!==scTok){stopCam();return}
     const BD=(window.BarcodeDetectionAPI&&window.BarcodeDetectionAPI.BarcodeDetector)||window.BarcodeDetector;
     const det=new BD({formats:["ean_13","ean_8","upc_a","upc_e"]});
     const v=$("#scv"); if(!v){stopCam();return}
     v.srcObject=scnStream; await v.play(); $("#scs").textContent="Halte den Barcode ruhig ins Bild."; scnRun=true;
     const loop=async()=>{
-      if(!scnRun) return;
+      if(!scnRun||tok!==scTok) return;
       try{const c=await det.detect(v); if(c.length){scnRun=false;stopCam();lookup(c[0].rawValue);return}}catch(e){}
       setTimeout(loop,150);
     };
@@ -1246,13 +1256,13 @@ async function offFetch(ean){
   const j=await r.json(); const pr=j&&j.product; if(!pr) return null;
   const nu=pr.nutriments||{}; let k=nu["energy-kcal_100g"]; if(k==null&&nu["energy_100g"]!=null) k=nu["energy_100g"]/4.184;
   const pp=nu["proteins_100g"];
-  return {n:((pr.brands?String(pr.brands).split(",")[0]+" ":"")+(pr.product_name||"Unbekanntes Produkt")).trim(),k:k==null?null:Math.round(k),p:pp==null?null:Math.round(pp*10)/10,s:parseFloat(pr.serving_quantity)||null,ss:pr.serving_size||""};
+  return {v:2,n:((pr.brands?String(pr.brands).split(",")[0]+" ":"")+(pr.product_name||"Unbekanntes Produkt")).trim(),k:k==null?null:Math.round(k),p:pp==null?null:Math.round(pp*10)/10,s:parseFloat(pr.serving_quantity)||null,ss:pr.serving_size||"",q:parseFloat(pr.product_quantity)||null,qs:pr.quantity||""};
 }
 async function lookup(ean){
   ean=String(ean).replace(/\D/g,"");
   if(ean.length<8){toast("Ungültige Nummer");return}
   scanShell(`<p class="scs">Suche ${ean} …</p>`);
-  let p=OFFC[ean];
+  let p=OFFC[ean]; if(p&&p.v!==2) p=null;
   if(!p){
     try{p=await offFetch(ean);}catch(e){scanShell(`<p class="scs">Keine Verbindung zu Open Food Facts. Versuche es später noch einmal.</p><div class="stack"><button class="btn" data-scr>Nochmal scannen</button></div>`);return}
     if(p){OFFC[ean]=p;try{localStorage.setItem(OFFK,JSON.stringify(OFFC));}catch(e){}}
@@ -1261,11 +1271,12 @@ async function lookup(ean){
   showProd(p);
 }
 function showProd(p){
-  SCP={p:Object.assign({},p)}; const miss=p.k==null;
+  SCP={p:Object.assign({},p)}; const miss=p.k==null, missP=p.p==null;
   scanShell(`<h2 style="margin:0 0 4px;font-size:22px;line-height:1.25">${esc(p.n)}</h2>
-   <p class="scs">${miss?"Keine Nährwerte hinterlegt. Trag die Werte pro 100 g von der Verpackung ein.":`Pro 100 g: ${p.k} kcal · ${p.p==null?"?":f1(p.p)} g Eiweiß`}</p>
-   <div class="frm">${miss?`<label>kcal pro 100 g<input id="sck" inputmode="numeric"></label><label>Eiweiß pro 100 g<input id="scp" inputmode="decimal"></label>`:""}
-   <label class="full">Menge in g oder ml${p.s?` (Portion laut Packung: ${esc(p.ss||p.s+" g")})`:""}<input id="sca" inputmode="decimal" value="${p.s||100}"></label>
+   <p class="scs">${miss?"Keine Nährwerte hinterlegt. Trag die Werte pro 100 g von der Verpackung ein.":`Pro 100 g: ${p.k} kcal · ${p.p==null?"?":f1(p.p)} g Eiweiß${p.q?`<br>Ganze Packung (${f1(p.q)} g): ${Math.round(p.k*p.q/100)} kcal · ${p.p==null?"?":f1(p.p*p.q/100)} g Eiweiß`:""}`}</p>
+   <div class="frm">${miss?`<label>kcal pro 100 g<input id="sck" inputmode="numeric"></label>`:""}${missP?`<label>Eiweiß pro 100 g<input id="scp" inputmode="decimal"></label>`:""}
+   <div class="full pkg">${p.q?`<button data-scam="${p.q}">Ganze Packung (${f1(p.q)})</button><button data-scam="${p.q/2}">½ Packung</button>`:""}${p.s?`<button data-scam="${p.s}">1 Portion (${f1(p.s)})</button>`:""}<button data-scam="100">100</button></div>
+   <label class="full">Menge in g oder ml<input id="sca" inputmode="decimal" value="${p.q||p.s||100}"></label>
    <div class="full scsum" id="scsum"></div>
    <div class="full scchk" id="scchk"></div>
    <button class="btn pri full" data-scadd>Ins Tagebuch eintragen</button></div>
@@ -1279,16 +1290,17 @@ function scUpd(){
   SCP.a=a; SCP.kk=k*a/100; SCP.pp=pr*a/100;
   const s=$("#scsum"); if(s) s.textContent=Math.round(SCP.kk)+" kcal · "+f1(SCP.pp)+" g Eiweiß";
   const c=$("#scchk"); if(c){
-    const T=tot(dkey(new Date())), G=DY.goal, restK=G.k-T.k, afterK=restK-SCP.kk, afterP=G.p-T.p-SCP.pp;
+    const T=tot(dyk), G=DY.goal, restK=G.k-T.k, afterK=restK-SCP.kk, afterP=G.p-T.p-SCP.pp;
     const ok=afterK>=0;
     c.className="full scchk "+(ok?"ok":"over");
-    c.innerHTML=`<b>${ok?"Passt noch rein":"Zu viel für heute"}</b><span>Heute schon ${Math.round(T.k)} von ${G.k} kcal. ${ok?"Danach noch "+Math.round(afterK)+" kcal übrig.":"Danach "+Math.round(-afterK)+" kcal über dem Ziel."} Eiweiß: ${afterP>0?"noch "+f1(afterP)+" g offen":"Ziel erreicht"}.</span>`;
+    c.innerHTML=`<b>${ok?"Passt noch rein":"Zu viel für heute"}</b><span>${dlabel(dyk)} schon ${Math.round(T.k)} von ${G.k} kcal. ${ok?"Danach noch "+Math.round(afterK)+" kcal übrig.":"Danach "+Math.round(-afterK)+" kcal über dem Ziel."} Eiweiß: ${afterP>0?"noch "+f1(afterP)+" g offen":"Ziel erreicht"}.</span>`;
   }
 }
 document.addEventListener("input",ev=>{if(["sca","sck","scp"].includes(ev.target.id))scUpd();});
 document.addEventListener("click",ev=>{
   const t=ev.target.closest("button"); if(!t) return; const d=t.dataset;
   if(d.scan!==undefined){openScan();return}
+  if(d.scam!==undefined){const e=$("#sca");if(e){e.value=d.scam;scUpd();}return}
   if(d.scr!==undefined){openScan();return}
   if(d.scx!==undefined){closeScan();return}
   if(d.scgo!==undefined){lookup(($("#scm")||{}).value||"");return}
@@ -1361,10 +1373,16 @@ const DCK="kochplaner.dc", DSK="kochplaner.dsync";
 let DC=null; try{DC=localStorage.getItem(DCK);}catch(e){}
 let dls=0; try{dls=parseInt(localStorage.getItem(DSK))||0;}catch(e){}
 let dRef=null,dUnsub=null,dReady=false,dSaving=false,dDirty=false,dTimer=null,dState="off",dcShow=false;
+var dRestoreMode=false;
 const dSetSync=u=>{dls=u;try{localStorage.setItem(DSK,String(u));}catch(e){}};
 const dLocalSave=()=>{try{localStorage.setItem(DLS,JSON.stringify(DY));}catch(e){}};
 function dMerge(r){
-  Object.keys(r.days||{}).forEach(k=>{if(!DY.days[k]) DY.days[k]=r.days[k];});
+  const sig=e=>[e.n,e.k,e.p,e.m].join("|");
+  Object.keys(r.days||{}).forEach(k=>{
+    if(!DY.days[k]){DY.days[k]=r.days[k];return}
+    const have=new Set(DY.days[k].map(sig));
+    r.days[k].forEach(e=>{if(!have.has(sig(e))) DY.days[k].push(e);});
+  });
   (r.foods||[]).forEach(f=>{if(!DY.foods.some(x=>x.n.toLowerCase()===f.n.toLowerCase())) DY.foods.push(f);});
 }
 function dStop(){if(dUnsub){dUnsub();dUnsub=null;}dRef=null;dReady=false;dState="off";}
@@ -1375,7 +1393,10 @@ function dStart(){
     if(snap.metadata.hasPendingWrites) return;
     if(snap.metadata.fromCache&&!snap.exists()) return;
     dState=snap.metadata.fromCache?"off":"online";
-    if(!snap.exists()){dReady=true;dPush(true);return}
+    if(!snap.exists()){
+      if(dRestoreMode){dRestoreMode=false;dStop();DC=null;try{localStorage.removeItem(DCK);localStorage.removeItem(DSK);}catch(e){}toast("Diesen Code gibt es nicht. Bitte prüfen.");if(pm==="H"&&!pnl.hidden)openHh();return}
+      dReady=true;dPush(true);return}
+    dRestoreMode=false;
     let r; try{r=JSON.parse(snap.data().dyS);}catch(e){return}
     const ru=snap.data().u||0, lu=DY.u||0;
     if(ru>dls&&lu<=dls){
@@ -1440,8 +1461,8 @@ function suggestHtml(){
 const _dyH4=dyHtml;
 dyHtml=function(){
   let h=_dyH4();
-  if(UNDO) h=h.replace('<h3 class="sec">Gegessen</h3>',`<div class="undo"><span>Gelöscht: ${esc(UNDO.e.n)}</span><button class="btn" data-dyundo>Rückgängig</button></div><h3 class="sec">Gegessen</h3>`);
-  h=h.replace('<h3 class="sec">Rezept eintragen</h3>',suggestHtml()+'<h3 class="sec">Rezept eintragen</h3>');
+  if(UNDO) h=h.replace('<h3 class="sec">Gegessen</h3>',()=>`<div class="undo"><span>Gelöscht: ${esc(UNDO.e.n)}</span><button class="btn" data-dyundo>Rückgängig</button></div><h3 class="sec">Gegessen</h3>`);
+  h=h.replace('<h3 class="sec">Rezept eintragen</h3>',()=>suggestHtml()+'<h3 class="sec">Rezept eintragen</h3>');
   return h;
 };
 document.addEventListener("click",ev=>{
@@ -1453,7 +1474,7 @@ document.addEventListener("click",ev=>{
   const t=ev.target.closest("button"); if(!t||pm!=="H"||pnl.hidden) return; const d=t.dataset;
   if(d.dcnew!==undefined){DC=newCode();try{localStorage.setItem(DCK,DC);}catch(e){}dSetSync(0);dcShow=true;if(!window.FB)toast("Keine Verbindung, der Code ist gespeichert");dStart();openHh();return}
   if(d.dcjoin!==undefined){const m=($("#dc-c")||{value:""}).value.match(/([a-z0-9]{16,64})\s*$/i);if(!m){toast("Das ist kein gültiger Code");return}
-    DC=m[1].toLowerCase();try{localStorage.setItem(DCK,DC);}catch(e){}dSetSync(0);dcShow=false;dStart();openHh();toast("Wird wiederhergestellt");return}
+    DC=m[1].toLowerCase();try{localStorage.setItem(DCK,DC);}catch(e){}dSetSync(0);dcShow=false;dRestoreMode=true;dStart();openHh();toast("Wird wiederhergestellt");return}
   if(d.dcshow!==undefined){dcShow=!dcShow;openHh();return}
   if(d.dccopy!==undefined){copyTxt(DC);return}
   if(t.id==="dcoff"){ if(t.dataset.c){dStop();DC=null;try{localStorage.removeItem(DCK);localStorage.removeItem(DSK);}catch(e){}dls=0;openHh();toast("Sicherung beendet")} else {t.dataset.c=1;t.textContent="Wirklich beenden?";setTimeout(()=>{if(t.isConnected){delete t.dataset.c;t.textContent="Sicherung beenden"}},3500)} return}
@@ -1496,7 +1517,7 @@ dyHtml=function(){
 document.addEventListener("toggle",ev=>{const d=ev.target;if(d&&d.classList&&d.classList.contains("fold"))foldOpen[d.dataset.k]=d.open;},true);
 
 /* Version und Neu laden in den Einstellungen, Scanner-Bibliothek vorab laden */
-const APPV="15.10.2026, Stand 6";
+const APPV="15.10.2026, Stand 7";
 const _hh3=hhHtml;
 hhHtml=function(){return _hh3().replace(/<\/div>$/,`<h3 class="sec">App</h3><p class="note" style="margin-top:0">Version ${APPV}</p><div class="stack"><button class="btn" data-reload>Neu laden</button></div></div>`);};
 document.addEventListener("click",ev=>{const t=ev.target.closest("button");if(t&&t.dataset.reload!==undefined)location.reload();});
@@ -1584,6 +1605,17 @@ document.addEventListener("click",ev=>{
   if(cur===n) delete ST.rate[openId]; else ST.rate[openId]=n;
   persist(); redrawDetail();
 });
+
+/* Aufräumen: Verweise auf Rezepte, die es nicht mehr gibt (z. B. auf einem anderen Handy gelöscht), dürfen die App nicht stören */
+function cleanIds(){
+  let ch=false;
+  ["sel","done","rate"].forEach(f=>{const o=ST[f]; if(o&&typeof o==="object") Object.keys(o).forEach(k=>{if(!all[k]){delete o[k];ch=true;}});});
+  if(ST.week&&typeof ST.week==="object") Object.keys(ST.week).forEach(d=>{const w=ST.week[d]||{};Object.keys(w).forEach(s=>{if(w[s]&&!all[w[s]]){delete w[s];ch=true;}});});
+  if(ch) persist();
+}
+const _rn=render; render=function(){cleanIds();_rn();};
+const _sl2=shopList; shopList=function(u){const o={};Object.keys(u||{}).forEach(k=>{if(all[k])o[k]=u[k];});return _sl2(o);};
+const _rd2=redrawDetail; redrawDetail=function(){if(openId&&!all[openId]){closeRecipe();return}_rd2();};
 
 render();
 </script>
