@@ -193,6 +193,12 @@ main{padding-bottom:70px}
 .scchk.ok b{color:var(--accent)}
 .scchk.over{background:rgba(217,119,6,.14);border:1px solid var(--warn)}
 .scchk.over b{color:var(--warn)}
+.stars{display:flex;align-items:center;gap:2px;margin:6px 0 2px}
+.stars button{width:46px;height:46px;border:0;background:none;font-size:30px;line-height:1;color:var(--muted);padding:0}
+.stars button[aria-pressed="true"]{color:var(--warn)}
+.stars span{margin-left:8px;color:var(--muted);font-size:14px}
+.sugn{background:none;border:0;text-align:left;padding:0;min-width:0;display:block}
+.sugn b{font-weight:600;font-size:16px}
 .undo{display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:10px 0}
 .undo span{min-width:0;font-size:15px}
 details.fold{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin:10px 0;padding:0 12px}
@@ -356,7 +362,7 @@ const fmt=(q,u)=>{if(u==="g")return q>=1000?(q/1000).toFixed(1).replace(".",",")
 for(const k in all) if(k[0]==="I") delete all[k];
 
 /* ===== Kochplaner: Daten kommen aus dem 2-Personen-Plan, Mengen sind für 2 Personen ===== */
-const GROUPS=["Alle","Frühstück","Hauptmahlzeit","Snack & Beilage","Dessert"];
+const GROUPS=["Alle","★ Favoriten","Frühstück","Hauptmahlzeit","Snack & Beilage","Dessert"];
 const grp=r=>{const c=r.c||"";
   if(r.id[0]==="F"||/Frühstück|9-Uhr/.test(c)) return "Frühstück";
   if(c==="Dessert") return "Dessert";
@@ -421,7 +427,7 @@ document.addEventListener("visibilitychange",()=>{ if(openId&&document.visibilit
 /* ---------- Ansicht ---------- */
 const ck='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>';
 function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove("on"),1800)}
-const metaOf=r=>`${r.k} kcal · ${r.p} g Eiweiß · ${r.t}`;
+const metaOf=r=>`${r.k} kcal · ${r.p} g Eiweiß · ${r.t}${(ST.rate&&ST.rate[r.id])?" · "+"★".repeat(ST.rate[r.id]):""}`;
 const nSel=()=>Object.keys(ST.sel).length;
 function listHtml(){
   const q=fq.trim().toLowerCase();
@@ -711,7 +717,7 @@ let HH=null; try{HH=JSON.parse(localStorage.getItem(HK));}catch(e){}
 const hsave=()=>{try{localStorage.setItem(HK,JSON.stringify(HH))}catch(e){}};
 const hm=(location.hash||"").match(/h=([a-z0-9]{16,64})/i);
 if(hm){HH={mode:"cloud",code:hm[1].toLowerCase()};hsave();try{history.replaceState(null,"",location.pathname+location.search);}catch(e){}}
-const SH=["sel","sc","fr","cust","done","offers","week"];
+const SH=["sel","sc","fr","cust","done","offers","week","rate"];
 let fbRef=null,unsub=null,last={},syncState="off",ready=false;
 const SYK="kochplaner.sync.v1";
 const saveLast=()=>{try{localStorage.setItem(SYK,JSON.stringify(last))}catch(e){}};
@@ -781,10 +787,8 @@ document.addEventListener("click",ev=>{
   if(d.crsave!==undefined){saveCr(d.crsave);return}
   if(d.cred){openCr(d.cred);return}
   if(d.crdel){ if(t.dataset.c){ST.cust=ST.cust.filter(c=>c.id!==d.crdel);delete ST.sel[d.crdel];delete ST.rc[d.crdel];rebuildAll();persist();closeRecipe();toast("Rezept gelöscht")} else {t.dataset.c=1;t.textContent="Wirklich löschen?";setTimeout(()=>{if(t.isConnected){delete t.dataset.c;t.textContent="Löschen"}},3500)} return}
-  if(d.dyadd){const r=all[d.dyadd];addEntry({n:r.n,k:r.k,p:r.p,rid:r.id},dkey(new Date()));
-    if(ST.sel[r.id]){(ST.done||(ST.done={}))[r.id]=1;persist();}
-    toast(ST.sel[r.id]?"Eingetragen, im Plan als gegessen markiert":"Heute eingetragen: "+r.n);return}
-  if(d.gk){const dn=ST.done||(ST.done={}); if(dn[d.gk]) delete dn[d.gk]; else dn[d.gk]=1; persist(); const y=window.scrollY; render(); window.scrollTo(0,y); return}
+  if(d.dyadd){const r=all[d.dyadd]; if(ST.done&&ST.done[r.id]){toast("Schon als gegessen eingetragen");return} markEaten(r.id); toast("Ins Tagebuch eingetragen: "+r.n); if(openId) redrawDetail(); return}
+  if(d.gk){const dn=ST.done||(ST.done={}); if(dn[d.gk]){unmarkEaten(d.gk);toast("Aus dem Tagebuch entfernt")} else {markEaten(d.gk);toast("Ins Tagebuch eingetragen")} const y=window.scrollY; render(); window.scrollTo(0,y); return}
   if(t.id==="clrdone"){const dn=ST.done||{};Object.keys(dn).forEach(k=>{delete ST.sel[k];delete dn[k];});persist();render();toast("Erledigte entfernt");return}
   if(pm==="Y"&&!pnl.hidden){
     if(d.dyd){const x=new Date(dyk+"T12:00:00");x.setDate(x.getDate()+parseInt(d.dyd));if(dkey(x)<=dkey(new Date())){dyk=dkey(x);drawDy(false);}return}
@@ -1407,12 +1411,44 @@ function dcHtml(){
 }
 const _hh4=hhHtml;
 hhHtml=function(){return _hh4().replace('<h3 class="sec">Datenquellen</h3>',dcHtml()+'<h3 class="sec">Datenquellen</h3>');};
+/* Gegessen: Eintrag ins Tagebuch und Haken im Plan */
+function markEaten(id){const r=all[id]; addEntry({n:r.n,k:r.k,p:r.p,rid:id,gk:1},dkey(new Date())); if(ST.sel[id]){(ST.done||(ST.done={}))[id]=1;persist();}}
+function unmarkEaten(id){const key=dkey(new Date()),a=DY.days[key]||[];for(let i=a.length-1;i>=0;i--){if(a[i].rid===id&&a[i].gk){a.splice(i,1);dsave();break}} if(ST.done) delete ST.done[id]; persist();}
+
+/* Vorschläge: Gerichte, die zum restlichen Eiweiß und zu den restlichen Kalorien passen */
+function suggestHtml(){
+  if(dyk!==dkey(new Date())) return "";
+  const t=tot(dyk), G=DY.goal, rp=G.p-t.p, rk=G.k-t.k;
+  if(rp<=0) return `<h3 class="sec">Vorschläge</h3><p class="empty" style="padding:6px 0">Dein Eiweiß-Ziel für heute ist erreicht.</p>`;
+  const rate=ST.rate||{};
+  let pool;
+  if(rk>60){
+    pool=ALL.filter(r=>r.p>=8&&r.k>0&&r.k<=rk*1.25).map(r=>{
+      const cov=Math.min(r.p,rp)/rp, dens=r.p/r.k*100, fit=r.k<=rk?1:Math.max(0,1-(r.k-rk)/rk);
+      return {r,s:cov*60+Math.min(dens,12)*2.5+fit*25+(rate[r.id]||0)*3-(grp(r)==="Dessert"?15:0)};
+    });
+  }else{
+    pool=ALL.filter(r=>r.p>=8&&r.k>0&&r.k<=220).map(r=>({r,s:r.p/r.k*100+(rate[r.id]||0)}));
+  }
+  pool.sort((a,b)=>b.s-a.s);
+  const pick=[],cnt={};
+  for(const x of pool){const g=grp(x.r);if((cnt[g]||0)>=2)continue;pick.push(x.r);cnt[g]=(cnt[g]||0)+1;if(pick.length===3)break;}
+  const head=`<h3 class="sec">Vorschläge</h3><p class="note" style="margin:0 0 6px">Noch ${f1(rp)} g Eiweiß und ${Math.max(0,Math.round(rk))} kcal offen.${rk<=60?" Das Kalorienziel ist fast erreicht, deshalb nur leichte Sachen mit viel Eiweiß.":""}</p>`;
+  if(!pick.length) return head+'<p class="empty" style="padding:6px 0">Dazu passt gerade kein Rezept. Ein Shake oder Quark geht immer.</p>';
+  return head+`<div class="box">`+pick.map(r=>`<div class="ent"><button class="sugn" data-sgopen="${r.id}"><b>${esc(r.n)}</b><span class="meta">+${r.p} g Eiweiß · ${r.k} kcal</span></button><div class="eac"><button class="btn" data-sgadd="${r.id}" style="width:auto;padding:0 14px;height:44px">Eintragen</button></div></div>`).join("")+`</div>`;
+}
 const _dyH4=dyHtml;
 dyHtml=function(){
   let h=_dyH4();
   if(UNDO) h=h.replace('<h3 class="sec">Gegessen</h3>',`<div class="undo"><span>Gelöscht: ${esc(UNDO.e.n)}</span><button class="btn" data-dyundo>Rückgängig</button></div><h3 class="sec">Gegessen</h3>`);
+  h=h.replace('<h3 class="sec">Rezept eintragen</h3>',suggestHtml()+'<h3 class="sec">Rezept eintragen</h3>');
   return h;
 };
+document.addEventListener("click",ev=>{
+  const t=ev.target.closest("button"); if(!t||pm!=="Y"||pnl.hidden) return; const d=t.dataset;
+  if(d.sgadd){markEaten(d.sgadd);drawDy(true);toast("Eingetragen");return}
+  if(d.sgopen){closePanel();openRecipe(d.sgopen);return}
+});
 document.addEventListener("click",ev=>{
   const t=ev.target.closest("button"); if(!t||pm!=="H"||pnl.hidden) return; const d=t.dataset;
   if(d.dcnew!==undefined){DC=newCode();try{localStorage.setItem(DCK,DC);}catch(e){}dSetSync(0);dcShow=true;if(!window.FB)toast("Keine Verbindung, der Code ist gespeichert");dStart();openHh();return}
@@ -1460,7 +1496,7 @@ dyHtml=function(){
 document.addEventListener("toggle",ev=>{const d=ev.target;if(d&&d.classList&&d.classList.contains("fold"))foldOpen[d.dataset.k]=d.open;},true);
 
 /* Version und Neu laden in den Einstellungen, Scanner-Bibliothek vorab laden */
-const APPV="15.10.2026, Stand 5";
+const APPV="15.10.2026, Stand 6";
 const _hh3=hhHtml;
 hhHtml=function(){return _hh3().replace(/<\/div>$/,`<h3 class="sec">App</h3><p class="note" style="margin-top:0">Version ${APPV}</p><div class="stack"><button class="btn" data-reload>Neu laden</button></div></div>`);};
 document.addEventListener("click",ev=>{const t=ev.target.closest("button");if(t&&t.dataset.reload!==undefined)location.reload();});
@@ -1519,6 +1555,35 @@ document.addEventListener("click",ev=>{
   }
 });
 document.addEventListener("input",ev=>{if(ev.target.id==="wkq"){wkq=ev.target.value;$("#wkl").innerHTML=wkListHtml();}});
+
+/* ===== Zusatz 10: Sterne (1 bis 3) und Favoriten ===== */
+if(!ST.rate||typeof ST.rate!=="object"||Array.isArray(ST.rate)) ST.rate={};
+const FAVG="★ Favoriten";
+const starsOf=id=>(ST.rate||{})[id]||0;
+const _lh=listHtml;
+listHtml=function(){
+  if(fg!==FAVG) return _lh();
+  const q=fq.trim().toLowerCase();
+  const rows=ALL.filter(r=>starsOf(r.id)>0&&(!q||(r.n+" "+r.id).toLowerCase().includes(q)))
+    .sort((a,b)=>starsOf(b.id)-starsOf(a.id)||a.n.localeCompare(b.n,"de"));
+  if(!rows.length) return '<p class="empty">Noch keine Favoriten. Öffne ein Rezept und gib ihm 1 bis 3 Sterne.</p>';
+  return rows.map(r=>{const n=ST.sel[r.id]||0;
+    return `<div class="rc"><button class="rb" data-open="${r.id}"><span class="top"><span class="id">${r.id}</span><b>${esc(r.n)}</b></span><span class="meta">${metaOf(r)}</span></button><button class="add" data-add="${r.id}" aria-pressed="${n>0}" aria-label="${n>0?"Aus Plan nehmen":"Zum Plan hinzufügen"}">${n>0?(n>1?n+"×":"✓"):"+"}</button></div>`}).join("");
+};
+const _dh5=detailHtml;
+detailHtml=function(id){
+  const s=starsOf(id);
+  const row=`<div class="stars" role="group" aria-label="Bewertung">`+[1,2,3].map(n=>`<button data-star="${n}" aria-pressed="${s>=n}" aria-label="${n} Stern${n>1?"e":""}">${s>=n?"★":"☆"}</button>`).join("")+`<span>${s?s+" von 3 Sternen":"Bewerten"}</span></div>`;
+  return _dh5(id).replace('<h3 class="sec">Zutaten',row+'<h3 class="sec">Zutaten');
+};
+const _dp=dpool;
+dpool=function(){const out=[];_dp().forEach(r=>{out.push(r);for(let i=0;i<starsOf(r.id);i++)out.push(r);});return out;};
+document.addEventListener("click",ev=>{
+  const t=ev.target.closest("button"); if(!t||t.dataset.star===undefined||!openId) return;
+  const n=parseInt(t.dataset.star), cur=starsOf(openId);
+  if(cur===n) delete ST.rate[openId]; else ST.rate[openId]=n;
+  persist(); redrawDetail();
+});
 
 render();
 </script>
