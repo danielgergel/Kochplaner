@@ -193,6 +193,11 @@ main{padding-bottom:70px}
 .scchk.ok b{color:var(--accent)}
 .scchk.over{background:rgba(217,119,6,.14);border:1px solid var(--warn)}
 .scchk.over b{color:var(--warn)}
+.clr{position:relative;display:block;width:100%;margin-bottom:6px}
+.clr input{padding-right:46px!important;margin-bottom:0!important}
+.xbtn{position:absolute;right:3px;top:50%;transform:translateY(-50%);width:42px;height:42px;border:0;background:none;font-size:28px;line-height:1;color:var(--muted);padding:0}
+.clr input:placeholder-shown+.xbtn{display:none}
+input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
 .pkg{display:flex;flex-wrap:wrap;gap:6px}
 .pkg button{min-height:44px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);font-weight:600;font-size:15px}
 .stars{display:flex;align-items:center;gap:2px;margin:6px 0 2px}
@@ -372,6 +377,10 @@ const FIX={F7:{k:340,p:24},I2:{k:780,p:62},I10:{p:72},
   P5:{p:57},P21:{k:465},
   P16:{w:0.5,pt:"ca. 2 Portionen",u:"pro Portion"}};
 for(const id in FIX) if(all[id]) Object.assign(all[id],FIX[id]);
+
+/* Ausführlichere Zubereitung für die eigenen Rezepte (Stand 19.10.2026) */
+const STEPS={"F1":{"s":["Banane schälen und in grobe Stücke brechen.","300 ml Milch zuerst in den Mixer gießen.","Whey, Banane, Haferflocken, ein paar Eiswürfel und eine Prise Zimt dazugeben.","20 bis 30 Sekunden auf hoher Stufe mixen, bis keine Flocken mehr zu sehen sind.","Kurz probieren und sofort trinken."],"t":"Eiswürfel machen den Shake cremig und weniger „süß-pappig“. Für unterwegs in eine dicht schließende Flasche füllen und innerhalb von 1 bis 2 Stunden trinken."},"F2":{"s":["300 ml Milch zuerst in den Mixer gießen.","Whey Schoko, Erdnussmus, Haferflocken und ein paar Eiswürfel dazugeben.","20 bis 30 Sekunden mixen, bis alles glatt ist.","Kurz probieren und sofort trinken."],"t":"Schmeckt wie ein Snickers-Shake. Erdnussmus setzt sich gern am Boden ab, deshalb vor dem Trinken kurz schwenken."},"F3":{"s":["Wer TK-Beeren nimmt, legt sie 5 bis 10 Minuten vorher zum Antauen in die Schüssel.","250 g Skyr in eine Schüssel geben und glatt rühren.","Beeren und Haferflocken oder Granola darauf verteilen.","Mandeln darübergeben und den Honig darüberträufeln.","Direkt essen, damit Granola und Flocken knusprig bleiben."],"t":"Zarte Haferflocken müssen nicht eingeweicht werden. Wer sie weicher mag, rührt sie unter und lässt die Bowl 5 bis 10 Minuten stehen."},"F4":{"s":["Tomate waschen und in Scheiben schneiden, Schnittlauch in Röllchen schneiden.","3 Eier in eine Schüssel schlagen, mit Salz und Pfeffer verquirlen.","Beschichtete Pfanne bei mittlerer Hitze erwärmen, Eier hineingeben und unter sanftem Rühren stocken lassen. Vom Herd nehmen, solange sie noch leicht glänzen.","Toast rösten und mit körnigem Frischkäse bestreichen.","Tomatenscheiben und Rührei auf den Toast legen, mit Schnittlauch bestreuen."],"t":"Nicht zu heiß braten, sonst wird das Rührei trocken und zäh."},"F5":{"s":["Banane schälen und in Stücke brechen.","Banane, Eier, Haferflocken, Whey und Backpulver in einen hohen Becher geben.","Mit dem Stabmixer zu einem glatten Teig pürieren.","Beschichtete Pfanne bei mittlerer Hitze erwärmen. Kleine Teigportionen hineingeben, damit sie sich leicht wenden lassen.","Je Seite etwa 2 Minuten backen, gewendet wird, wenn die Oberfläche Bläschen wirft und der Rand fest ist.","Mit Zimt oder 50 g Beeren servieren."],"t":"Lieber kleine Pancakes backen, die lassen sich leichter wenden. Die Hitze nicht zu hoch stellen, sonst werden sie außen dunkel und innen roh."},"F6":{"s":["40 g Haferflocken, Skyr, Milch und Chiasamen in ein Glas oder eine Schüssel mit Deckel geben.","Gut verrühren, damit keine trockenen Klumpen bleiben.","Deckel drauf und über Nacht in den Kühlschrank stellen.","Morgens kurz umrühren und die Himbeeren darauf verteilen. TK-Himbeeren tauen bis dahin an.","Direkt aus dem Glas löffeln."],"t":"Das Glas hält sich im Kühlschrank 2 bis 3 Tage, also gern gleich mehrere vorbereiten. Zum Mitnehmen im verschlossenen Glas kühl transportieren."},"F7":{"s":["Gurke waschen und in dünne Scheiben schneiden.","Brezel waagerecht aufschneiden.","Beide Hälften mit Frischkäse light bestreichen.","Putenbrust und Gurkenscheiben auf die untere Hälfte legen, Deckel drauf."],"t":"Zum Mitnehmen in Brotpapier oder eine Dose packen und kühl halten. Besser erst kurz vor dem Essen belegen, sonst weicht die Brezel durch."},"F8":{"s":["Tomate in Scheiben schneiden, Schnittlauch in Röllchen schneiden.","1 TL Öl in einer beschichteten Pfanne bei mittlerer Hitze erwärmen.","Eier aufschlagen, in die Pfanne gleiten lassen und braten, bis das Eiweiß fest ist. Mit Salz und Pfeffer würzen.","Brot toasten und mit körnigem Frischkäse bestreichen.","Tomatenscheiben, Spiegeleier und Schnittlauch darauf anrichten. Wer will, legt Gurkenscheiben dazu."],"t":"Deckel kurz auf die Pfanne setzen, dann stockt das Eiweiß oben schneller, ohne dass das Eigelb hart wird."},"F9":{"s":["Kartoffeln waschen und in etwa 2 cm große Würfel schneiden. Airfryer auf 200 °C vorheizen.","Würfel mit 1 TL Öl, Paprikapulver und Salz mischen.","Kartoffeln in einer Lage in den Korb geben, ohne ihn zu überfüllen. 18 bis 20 Minuten garen, zwischendurch einmal wenden oder schütteln.","Quark mit Schnittlauch, Salz und Pfeffer verrühren.","In den letzten Minuten 1 TL Öl in der Pfanne erhitzen und die Eier zu Spiegeleiern braten.","Garprobe: Die Kartoffeln sind fertig, wenn sie außen knusprig sind und sich innen mit einer Gabel leicht einstechen lassen.","Kartoffeln mit Spiegeleiern und Kräuterquark anrichten."],"t":"Gleich große Würfel garen gleichmäßig. Übrige Kartoffeln halten sich im Kühlschrank 2 bis 3 Tage."},"M1":{"s":["Reis nach Packungsanleitung kochen.","Hähnchen in gleich große Würfel schneiden, Brokkoli in kleine Röschen teilen. Airfryer auf 180 °C vorheizen.","Hähnchen mit Öl, Sojasauce, Paprika und Knoblauchpulver mischen.","Hähnchen in den Korb geben, ohne ihn zu überfüllen, und 10 bis 12 Minuten garen. Zwischendurch einmal schütteln.","Brokkoli die letzten 6 Minuten dazugeben.","Garprobe: Das Hähnchen ist innen nicht mehr rosa, Kerntemperatur 75 °C.","Reis in eine Schale geben, Hähnchen und Brokkoli darauf anrichten."],"t":"Hält sich im Kühlschrank 3 Tage, gut für Mealprep. Zum Aufwärmen etwas Wasser über den Reis geben."},"M2":{"s":["Hähnchen in Streifen schneiden und mit Paprika und Salz würzen. Airfryer auf 180 °C vorheizen.","Hähnchenstreifen in den Korb geben, nicht überfüllen, und 8 bis 10 Minuten garen. Zwischendurch einmal schütteln, Kerntemperatur 75 °C.","Skyr mit Salz, Knoblauch und einem Spritzer Zitrone zum Dip verrühren.","Salat waschen, Tomate und Gurke in Scheiben oder Streifen schneiden.","Wraps mit Dip bestreichen, Salat, Gemüse, Hähnchen und Käse darauflegen, einrollen.","Wer mag, gart die Wraps zum Schluss 3 Minuten im Airfryer, bis der Käse geschmolzen ist."],"t":"Mit der Naht nach unten in den Airfryer legen, dann bleibt der Wrap zu. Zum Mitnehmen in Folie wickeln, den Dip separat transportieren."},"M3":{"s":["Kartoffeln waschen, in Würfel schneiden und mit Öl und Salz mischen. Airfryer auf 190 °C vorheizen.","Kartoffeln in den Korb geben und 20 Minuten garen, zwischendurch einmal schütteln.","Hähnchen mehrmals einschneiden und mit Salz, Pfeffer und Oregano würzen.","Ab Minute 8 das Hähnchen mit in den Korb legen, 190 °C bleiben. Etwa 15 Minuten garen, einmal wenden, Kerntemperatur mindestens 75 °C.","Tomaten und Mozzarella in Scheiben schneiden.","Pesto auf das Hähnchen streichen, Tomaten und Mozzarella darauflegen und die letzten 3 Minuten überbacken, bis der Käse schmilzt.","Hähnchen mit den Kartoffeln anrichten."],"t":"Wenn der Korb zu klein ist, Hähnchen und Kartoffeln locker nebeneinander legen und nicht stapeln."},"M4":{"s":["Reis nach Packungsanleitung kochen.","Zwiebel in kleine Würfel schneiden, Paprika entkernen und würfeln.","Öl in einer großen Pfanne erhitzen, Zwiebel kurz andünsten, dann das Hack dazugeben und krümelig anbraten, bis es durchgegart und nicht mehr rosa ist.","Paprika dazugeben und kurz mitbraten.","Tomatensoße, Paprikapulver, Salz und Pfeffer unterrühren und 5 Minuten köcheln lassen.","Den Reis untermischen, Käse darüberstreuen und kurz schmelzen lassen."],"t":"Hält sich im Kühlschrank 3 Tage und lässt sich gut vorkochen. Zum Aufwärmen einen Schluck Wasser dazugeben."},"M5":{"s":["Nudeln in Salzwasser nach Packungsanleitung kochen.","Hähnchen in Würfel schneiden, Knoblauch fein hacken.","Hähnchen mit Knoblauch in Öl in der Pfanne rundherum anbraten oder 10 Minuten im auf 180 °C vorgeheizten Airfryer garen, einmal schütteln. Kerntemperatur 75 °C.","Tomatensoße zum Hähnchen geben und 5 Minuten köcheln lassen.","Nudeln abgießen und mit der Sauce mischen.","Parmesan und Basilikum darüber, servieren."],"t":"Etwas Nudelwasser macht die Sauce schön cremig. Hält sich im Kühlschrank 2 bis 3 Tage."},"M6":{"s":["Süßkartoffel waschen und in Würfel schneiden. Airfryer auf 190 °C vorheizen.","Würfel mit Öl und Salz mischen, in den Korb geben, ohne ihn zu überfüllen, und 18 Minuten garen. Zwischendurch einmal schütteln.","Hähnchen in Würfel schneiden und mit Paprikagewürz würzen.","Ab Minute 8 das Hähnchen zu den Süßkartoffeln in den Korb geben. Kerntemperatur 75 °C.","Salat waschen, Avocado in Scheiben schneiden.","Skyr mit einer Prise Salz glattrühren.","Salat in eine Schüssel geben, Süßkartoffeln, Hähnchen und Avocado darauf anrichten, Skyr-Dip dazugeben."],"t":"Für Mealprep Süßkartoffeln, Hähnchen und Dip getrennt aufbewahren (3 Tage). Avocado erst kurz vor dem Essen schneiden, sonst wird sie braun."},"M7":{"s":["Reis nach Packungsanleitung kochen.","Zwiebel würfeln, Paprika entkernen und würfeln, Knoblauch fein hacken.","Zwiebel und Hack in einer großen Pfanne scharf anbraten, bis das Hack krümelig und nicht mehr rosa ist.","Paprika, Knoblauch, Chili, Kreuzkümmel, Paprikapulver und Salz dazugeben und kurz mitbraten.","Kidneybohnen abspülen und abtropfen lassen, dann mit der Tomatensoße in die Pfanne geben und 10 Minuten köcheln lassen. Zwischendurch umrühren.","Chili auf dem Reis anrichten und mit einem Löffel Skyr servieren."],"t":"Schmeckt am nächsten Tag noch besser und hält sich im Kühlschrank 3 Tage. Chili vorsichtig dosieren und nachwürzen."},"M8":{"s":["Mozzarella in Scheiben schneiden oder zupfen, Tomaten in Scheiben schneiden. Airfryer auf 180 °C vorheizen.","Je einen Wrap (muss in den Korb passen, ggf. zuschneiden) 2 Minuten vorbacken.","Skyr mit Knoblauch und Salz zum Dip verrühren.","Wrap mit Tomatensoße bestreichen, Mozzarella und Tomatenscheiben darauflegen.","Bei 190 °C 4 bis 5 Minuten backen, bis der Käse geschmolzen ist. Den zweiten Wrap genauso machen, falls beide nicht gleichzeitig hineinpassen.","Mit Basilikum und Oregano bestreuen, Dip dazu servieren."],"t":"Den Rand im Auge behalten, er wird schnell dunkel. Optional 4 Scheiben Putenbrust darauflegen (+60 kcal, +12 g Eiweiß)."},"A1":{"s":["Airfryer auf 190 °C vorheizen (ca. 3 Minuten). Kartoffeln waschen und in Spalten schneiden, Paprika und Zucchini in mundgerechte Stücke schneiden.","Kartoffelspalten mit 2 TL Öl und Salz mischen und locker im Korb verteilen, 20 Minuten bei 190 °C garen. Nach 8 Minuten wenden oder den Korb kräftig schütteln.","Holzspieße kurz in Wasser legen, damit sie nicht verbrennen. Hähnchen in gleichmäßige Würfel schneiden und abwechselnd mit Paprika und Zucchini auf die Spieße stecken.","Spieße mit Salz, Pfeffer und Paprikapulver würzen und ab Minute 8 zu den Kartoffeln in den Korb legen (190 °C bleibt, nicht stapeln). Falls nötig, in zwei Runden garen.","Quark mit Kräutern und einer Prise Salz glatt rühren.","Garprobe: Das Hähnchen ist durch, wenn es innen nicht mehr rosa ist (Kerntemperatur 75 °C) und die Kartoffeln außen goldbraun sind. Mit dem Kräuterquark servieren."],"t":"Wenn die Spieße zu lang für den Korb sind, einfach kürzen oder schräg legen. Kartoffeln nicht überfüllen, sonst werden sie weich statt knusprig."},"A2":{"s":["Tomaten in Scheiben, Mozzarella in dünne Scheiben schneiden. Basilikum zupfen.","3 Eier in eine Schüssel schlagen, mit Salz und Pfeffer verquirlen.","1 TL Öl in einer Pfanne bei mittlerer Hitze erhitzen, Eier hineingießen und stocken lassen, bis die Unterseite fest ist, die Oberseite aber noch leicht glänzt.","Tomaten und Mozzarella auf eine Hälfte legen, die andere Hälfte darüberklappen und 2 Minuten ziehen lassen, damit der Käse leicht schmilzt.","Basilikum darauf geben und mit den 3 Scheiben Brot servieren."],"t":"Nicht zu heiß braten, sonst wird das Omelett außen braun und innen noch flüssig. Tomaten kurz auf Küchenpapier abtupfen, dann wird das Omelett nicht wässrig."},"A3":{"s":["Nudeln nach Packungsbeilage in Salzwasser kochen, abgießen. Airfryer auf 180 °C vorheizen.","Hähnchenbrust zwischen Frischhaltefolie flach klopfen (gleichmäßig ca. 1,5 cm dick), damit sie gleichmäßig gar wird. Mit Salz und Pfeffer würzen.","Dünn mit Öl einstreichen und in den Semmelbröseln wenden, die Brösel fest andrücken.","Im Airfryer bei 180 °C 12 Minuten garen, nach der Hälfte der Zeit einmal wenden.","Tomatensoße mit Oregano auf dem Hähnchen verteilen, Mozzarella darauf legen und bei 180 °C 4 bis 5 Minuten überbacken, bis der Käse geschmolzen ist. Garprobe: Kerntemperatur 75 °C, innen nicht mehr rosa.","Mit den Nudeln und Salat anrichten."],"t":"Beim Klopfen die Folie nutzen, damit nichts spritzt. Dicke Stücke brauchen eher die längere Garzeit."},"A4":{"s":["Reis nach Packungsbeilage in Salzwasser kochen. Währenddessen Hähnchen in mundgerechte Würfel schneiden und Paprika, Zucchini und Brokkoli klein schneiden.","Eine Pfanne mit wenig Wasser oder Öl erhitzen, Hähnchenwürfel mit Salz 3 bis 4 Minuten anbraten.","Currypaste dazugeben und 1 Minute mitbraten, bis es duftet.","Gemüse zugeben, kurz mitbraten, dann Kokosmilch und einen Schuss Wasser angießen.","Bei mittlerer Hitze 10 Minuten köcheln lassen, bis das Gemüse bissfest ist. Hähnchen ist gar, wenn es innen nicht mehr rosa ist. Mit Salz und Pfeffer abschmecken.","Auf dem Reis anrichten."],"t":"Sauce zu dick? Einen Schluck Wasser nachgießen. Hält sich 2 bis 3 Tage im Kühlschrank, gut zum Vorkochen."},"A5":{"s":["Paprika und Tomaten würfeln, Knoblauch fein hacken.","1 TL Öl in einer Pfanne erhitzen, Paprika und Knoblauch 2 bis 3 Minuten anbraten.","Tomaten, Kreuzkümmel, Paprikapulver und Salz zugeben und 8 Minuten köcheln lassen, bis die Sauce etwas eindickt.","Mit einem Löffel drei Mulden in die Sauce drücken und die Eier hineinschlagen.","Deckel auflegen und 5 Minuten bei niedriger Hitze stocken lassen, bis das Eiweiß fest ist.","Feta darüber bröseln und mit dem Brot servieren."],"t":"Wer das Eigelb fester mag, lässt es 1 bis 2 Minuten länger stocken. Die Pfanne nicht zu heiß stellen, sonst brennt die Sauce an."},"S1":{"s":["Skyr in eine Schüssel geben.","Beeren darauf geben (TK-Beeren vorher 10 bis 15 Minuten antauen lassen).","Mandeln darüberstreuen und gleich essen."],"t":"Zum Mitnehmen in eine verschlossene Box füllen und kühl lagern, am besten am selben Tag essen."},"S2":{"s":["Skyr in eine Schüssel geben, Kakao und Honig (oder Süßstoff) dazugeben.","Mit einem Löffel glatt rühren, bis keine Kakaoklümpchen mehr zu sehen sind.","Banane in Scheiben schneiden, auf die Creme legen und probieren."],"t":"Mit mehr Kakao wird die Creme dunkler und bitterer. Bananenscheiben erst kurz vor dem Essen darauflegen, sonst werden sie braun."},"S3":{"s":["Gurke waschen und in Stifte schneiden.","Putenscheiben einzeln auslegen und dünn mit Frischkäse bestreichen.","Je ein paar Gurkenstifte an das Ende legen und die Pute straff aufrollen.","Röllchen mit den Reiswaffeln anrichten."],"t":"Für unterwegs in eine Box legen und kühl halten, im Kühlschrank bis zu 1 Tag haltbar. Reiswaffeln separat einpacken, damit sie knusprig bleiben."},"S4":{"s":["Tomaten waschen und in Scheiben oder kleine Würfel schneiden.","Brot im Toaster oder in der Pfanne rösten.","Körnigen Frischkäse auf das Brot geben, Tomaten darauf legen.","Mit Olivenöl, Salz, Pfeffer und Basilikum würzen."],"t":"Brot erst kurz vor dem Essen belegen, damit es knusprig bleibt."},"S5":{"s":["Quark in eine Schüssel geben, Kakao und Süßstoff oder Honig dazugeben.","Mit einem Schneebesen oder Löffel 1 Minute cremig rühren, bis eine gleichmäßige Masse entsteht.","Probieren und bei Bedarf nachsüßen.","Himbeeren (TK vorher antauen) darauf verteilen."],"t":"Mit dem Schneebesen wird die Mousse luftiger. Am besten vorbereitet 30 Minuten kühl stellen."},"S6":{"s":["Mozzarella abtropfen lassen, Mozzarella und Tomaten in Scheiben schneiden.","Abwechselnd auf einem Teller schichten.","Mit Olivenöl, Salz und Basilikum würzen.","Putenscheiben daneben legen und gleich essen."],"t":"Tomaten kurz vor dem Anrichten salzen, sonst ziehen sie Wasser."},"S7":{"s":["300 ml Wasser in einen Shaker oder ein Glas geben.","Whey dazugeben und 20 bis 30 Sekunden kräftig schütteln oder mixen, bis keine Klümpchen mehr da sind.","Apfel waschen und dazu essen, am besten in Spalten geschnitten.","Gleich trinken, langsam in kleinen Schlucken."],"t":"Für Tage mit wenig Zeit. Zu Hause besser Variante S1 bis S6."},"S8":{"s":["Milch in den Shaker oder Mixer geben.","Whey und Eiswürfel dazugeben, optional etwas Zimt.","20 bis 30 Sekunden kräftig mixen oder schütteln, bis alles glatt ist.","Kalt und langsam trinken."],"t":"Eiswürfel kurz mitmixen, dann wird der Shake schön kalt. Bei Übelkeit in kleinen Schlucken trinken."},"S9":{"s":["Skyr in eine Box geben und glatt rühren.","Haferflocken darauf geben. Zarte Flocken müssen nicht eingeweicht werden. Wer sie weicher mag, rührt sie unter und lässt sie 5 bis 10 Minuten quellen oder die Box über Nacht im Kühlschrank stehen.","Beeren darauf verteilen (TK-Beeren am Vorabend einpacken, dann tauen sie bis zum Mittag an).","Mit Honig beträufeln, Deckel schließen und kühl transportieren.","Vor dem Essen kurz umrühren und probieren."],"t":"Wer die Haferflocken knusprig mag, packt sie getrennt ein und gibt sie erst vor dem Essen dazu."},"S10":{"s":["Maiswaffeln auf einen Teller legen.","Körnigen Frischkäse gleichmäßig auf die Waffeln löffeln.","Mit Honig beträufeln und gleich essen."],"t":"Erst kurz vor dem Essen belegen, sonst werden die Waffeln weich. Zum Mitnehmen Waffeln und Frischkäse getrennt transportieren."},"S11":{"s":["Schnittlauch waschen und in Röllchen schneiden.","Körnigen Frischkäse auf die Maiswaffeln löffeln.","Hähnchenaufschnitt darauf legen.","Mit Salz, Pfeffer und Schnittlauch würzen und gleich essen."],"t":"Zum Mitnehmen Waffeln getrennt einpacken und erst vor dem Essen belegen. Aufschnitt kühl lagern."},"S12":{"s":["Mozzarella abtropfen lassen, Mozzarella und Tomaten in Scheiben schneiden.","Abwechselnd auf einem Teller anrichten.","Mit Balsamico und Olivenöl beträufeln.","Mit Salz, Pfeffer und Basilikum würzen und probieren."],"t":"Tomaten kurz vor dem Servieren salzen, damit sie nicht zu viel Wasser ziehen."},"S13":{"s":["Becher aus dem Kühlschrank nehmen und Mindesthaltbarkeit prüfen.","Deckel abziehen, gut umrühren.","Direkt aus dem Becher essen."],"t":null},"S14":{"s":["Becher aus dem Kühlschrank nehmen und Mindesthaltbarkeit prüfen.","Deckel abziehen, gut umrühren.","Direkt aus dem Becher essen."],"t":null}};
+for(const id in STEPS){const r=all[id];if(!r)continue;r.s=STEPS[id].s;const t=STEPS[id].t;if(t&&!(r.note||"").includes(t.slice(0,25)))r.note=(r.note?r.note+" ":"")+t;}
 
 
 /* ===== Kochplaner: Daten kommen aus dem 2-Personen-Plan, Mengen sind für 2 Personen ===== */
@@ -731,7 +740,8 @@ const hsave=()=>{try{localStorage.setItem(HK,JSON.stringify(HH))}catch(e){}};
 const hm=(location.hash||"").match(/h=([a-z0-9]{16,64})/i);
 var joinMode=false;
 if(hm){const oc=HH&&HH.code;HH={mode:"cloud",code:hm[1].toLowerCase()};if(oc!==HH.code){try{localStorage.removeItem("kochplaner.sync.v1");}catch(e){}joinMode=true;}hsave();try{history.replaceState(null,"",location.pathname+location.search);}catch(e){}}
-const SH=["sel","sc","fr","cust","done","offers","week","rate"];
+const SH=["sel","sc","fr","cust","done","offers","week","rate","aoffers","plz","stores","wish"];
+const DFLT=k=>k==="plz"?"":(k==="cust"||k==="offers"||k==="stores"||k==="wish"?[]:{});
 let fbRef=null,unsub=null,last={},syncState="off",ready=false;
 const SYK="kochplaner.sync.v1";
 const saveLast=()=>{try{localStorage.setItem(SYK,JSON.stringify(last))}catch(e){}};
@@ -755,7 +765,7 @@ function startSync(){
 function applyRemote(d){
   let ch=false,cust=false;
   SH.forEach(k=>{const s=d[k+"S"]; if(typeof s!=="string"||s===last[k]) return;
-    const loc=JSON.stringify(ST[k]||(k==="cust"||k==="offers"?[]:{}));
+    const loc=JSON.stringify(ST[k]||DFLT(k));
     if(last[k]!==undefined&&loc!==last[k]) return; /* eigene, noch nicht gesendete Änderung bleibt erhalten */
     last[k]=s;try{ST[k]=JSON.parse(s);ch=true;if(k==="cust")cust=true;}catch(e){}});
   saveLast();
@@ -770,7 +780,8 @@ function pushShared(force){
   if(!fbRef||!ready) return;
   if(saving){dirty=true;return}
   const o={},sent=[],prev={};
-  SH.forEach(k=>{const s=JSON.stringify(ST[k]||(k==="cust"||k==="offers"?[]:{})); if(force||s!==last[k]){o[k+"S"]=s;sent.push(k);prev[k]=last[k];last[k]=s;}});
+  SH.forEach(k=>{if(k==="aoffers")return;const s=JSON.stringify(ST[k]||DFLT(k)); if(force||s!==last[k]){o[k+"S"]=s;sent.push(k);prev[k]=last[k];last[k]=s;}});
+  try{const sl=JSON.stringify(shopLabels());if(force||sl!==last.shopS){o.shopS=sl;sent.push("shopS");prev.shopS=last.shopS;last.shopS=sl;}}catch(e){}
   if(!sent.length) return;
   o.u=Date.now(); saving=true;
   FB.setDoc(fbRef,o,{merge:true}).then(saveLast).catch(()=>{sent.forEach(k=>{last[k]=prev[k]});syncState="error";chip();}).finally(()=>{saving=false;if(dirty){dirty=false;pushShared(false);}});
@@ -1325,16 +1336,25 @@ document.addEventListener("click",ev=>{
 
 /* ===== Zusatz 5: Angebote vergleichen (manuell eingetragen) ===== */
 if(!Array.isArray(ST.offers)) ST.offers=[];
+if(!ST.aoffers||typeof ST.aoffers!=="object"||Array.isArray(ST.aoffers)) ST.aoffers={};
+const autoItems=()=>Array.isArray(ST.aoffers.items)?ST.aoffers.items:[];
+const autoN=()=>autoItems().filter(o=>o&&(!o.u||o.u>=dkey(new Date()))).length;
+function shopLabels(){const L=shopList(ST.sel||{}),a=[];CATS.forEach(c=>L.out[c].forEach(x=>{if(a.indexOf(x.l)<0)a.push(x.l);}));return a;}
+function autoInfo(){
+  if(!autoN()) return '<p class="note" style="margin:8px 0 0">Automatisch geholte Angebote erscheinen hier, sobald die Wochen-Aufgabe sie in euren Haushalt geschrieben hat.</p>';
+  const at=ST.aoffers.at?(()=>{const [y,m,d]=String(ST.aoffers.at).split("-");return d+"."+m+".";})():"";
+  return `<p class="note" style="margin:8px 0 0">${autoN()} Angebote automatisch geholt${at?" (Stand "+at+")":""}. Die Angaben sind nicht immer vollständig, bitte vor dem Einkauf kurz prüfen.</p>`;
+}
 const STORES=["REWE","Lidl","Aldi","Edeka","Kaufland","Penny","Netto","Anderer"];
 const offerMatch=(a,b)=>{
   a=nm(a);b=nm(b); if(!a||!b) return false;
   if(a.includes(b)||b.includes(a)) return true;
   const aw=a.split(" ").filter(w=>w.length>=4), bw=b.split(" ");
-  return aw.some(w=>bw.some(x=>x.length>=4&&(x===w||stripPl(x)===stripPl(w))));
+  return aw.some(w=>bw.some(x=>x.length>=4&&(x===w||stripPl(x)===stripPl(w)||(Math.min(x.length,w.length)>=6&&(x.startsWith(w)||w.startsWith(x))))));
 };
 function offersCompare(){
   const L=shopList(ST.sel), labels=[]; CATS.forEach(c=>L.out[c].forEach(x=>labels.push(x.l)));
-  const today=dkey(new Date()), live=(ST.offers||[]).filter(o=>!o.u||o.u>=today), by={};
+  const today=dkey(new Date()), live=(ST.offers||[]).concat(autoItems()).filter(o=>o&&o.i&&o.s&&(!o.u||o.u>=today)), by={};
   live.forEach(o=>{const m=labels.find(l=>offerMatch(o.i,l)); if(!m) return; const b=by[o.s]||(by[o.s]={});if(!b[m]||(parseFloat(String(o.pr).replace(",","."))||0)<(parseFloat(String(b[m].pr).replace(",","."))||0)) b[m]=o;});
   const rows=Object.keys(by).map(s=>({s,items:Object.keys(by[s]).map(l=>({l,o:by[s][l]}))})).sort((a,b)=>b.items.length-a.items.length);
   return {rows,total:labels.length,live:live.length};
@@ -1342,7 +1362,7 @@ function offersCompare(){
 const ofDate=u=>{if(!u)return"";const [a,b,c]=u.split("-");return " bis "+c+"."+b+".";};
 function offersHtml(){
   const C=offersCompare(), today=dkey(new Date());
-  const res=!ST.offers.length?'<p class="empty" style="padding:6px 0">Noch keine Angebote eingetragen. Schau in die Prospekte und trag ein, was dich interessiert.</p>'
+  const res=!(ST.offers.length||autoN())?'<p class="empty" style="padding:6px 0">Noch keine Angebote eingetragen. Schau in die Prospekte und trag ein, was dich interessiert.</p>'
    :!C.total?'<p class="empty" style="padding:6px 0">Wähle Rezepte im Plan, dann siehst du, welcher Laden für deine Liste am meisten bietet.</p>'
    :!C.rows.length?'<p class="empty" style="padding:6px 0">Keine eingetragenen Angebote passen zu deiner Einkaufsliste.</p>'
    :C.rows.map((r,i)=>`<div class="ofr${i===0?" best":""}"><b>${i===0?"Beste Wahl: ":""}${esc(r.s)}</b><span class="meta" style="display:block">${r.items.length} von ${C.total} Artikeln im Angebot</span>${r.items.map(x=>`<span class="meta" style="display:block">${esc(x.l)}: ${esc(x.o.pr||"Angebot")}${x.o.pr&&!/€/.test(x.o.pr)?" €":""}${ofDate(x.o.u)}</span>`).join("")}</div>`).join("");
@@ -1350,7 +1370,7 @@ function offersHtml(){
   const list=ST.offers.map((o,i)=>`<div class="ent"><b>${esc(o.i)}</b><span class="meta">${esc(o.s)} · ${esc(o.pr||"")}${o.pr&&!/€/.test(o.pr)?" €":""}${ofDate(o.u)}${o.u&&o.u<today?" · abgelaufen":""}</span><div class="eac"><button data-ofx="${i}" aria-label="Angebot löschen">×</button></div></div>`).join("");
   return `<h3 class="sec">Angebote vergleichen</h3>
   <div class="box" style="padding:12px">
-   <div id="ofres">${res}</div>
+   <div id="ofres">${res}</div>${autoInfo()}
    <p class="note" style="margin:10px 0 6px">Angebote der Händler schaust du in den Prospekten an (öffnet im Browser). Die App holt sie nicht von allein, weil es dafür keine offene Schnittstelle gibt.</p>
    <div class="alts" style="margin-top:0">${links}</div>
   </div>
@@ -1528,7 +1548,7 @@ dyHtml=function(){
 document.addEventListener("toggle",ev=>{const d=ev.target;if(d&&d.classList&&d.classList.contains("fold"))foldOpen[d.dataset.k]=d.open;},true);
 
 /* Version und Neu laden in den Einstellungen, Scanner-Bibliothek vorab laden */
-const APPV="19.10.2026, Stand 8";
+const APPV="19.10.2026, Stand 11";
 const _hh3=hhHtml;
 hhHtml=function(){return _hh3().replace(/<\/div>$/,`<h3 class="sec">App</h3><p class="note" style="margin-top:0">Version ${APPV}</p><div class="stack"><button class="btn" data-reload>Neu laden</button></div></div>`);};
 document.addEventListener("click",ev=>{const t=ev.target.closest("button");if(t&&t.dataset.reload!==undefined)location.reload();});
@@ -1627,6 +1647,54 @@ function cleanIds(){
 const _rn=render; render=function(){cleanIds();_rn();};
 const _sl2=shopList; shopList=function(u){const o={};Object.keys(u||{}).forEach(k=>{if(all[k])o[k]=u[k];});return _sl2(o);};
 const _rd2=redrawDetail; redrawDetail=function(){if(openId&&!all[openId]){closeRecipe();return}_rd2();};
+
+/* ===== Zusatz 11: × zum Löschen in Suchfeldern ===== */
+const CLRSEL="#q,#dyq,#qk,#fsr,#wkq,#hh-c,#dc-c";
+function enhanceClear(){
+  document.querySelectorAll(CLRSEL).forEach(i=>{
+    if(i.parentElement&&i.parentElement.classList.contains("clr")) return;
+    const w=document.createElement("span"); w.className="clr";
+    i.parentNode.insertBefore(w,i); w.appendChild(i);
+    const b=document.createElement("button"); b.type="button"; b.className="xbtn"; b.setAttribute("aria-label","Eingabe löschen"); b.textContent="×";
+    w.appendChild(b);
+  });
+}
+new MutationObserver(enhanceClear).observe(document.body,{childList:true,subtree:true});
+enhanceClear();
+document.addEventListener("click",ev=>{
+  const b=ev.target.closest(".xbtn"); if(!b) return;
+  const i=b.previousElementSibling; if(!i) return;
+  i.value=""; i.dispatchEvent(new Event("input",{bubbles:true})); i.focus();
+});
+
+/* ===== Zusatz 12: Einstellungen für Angebote: Postleitzahl, Läden, feste Artikel ===== */
+const ALLSTORES=["REWE","Lidl","Penny","Aldi","Edeka","Kaufland","Netto"];
+const DEFWISH=["Skyr","Wasser","Rinderhack mager","Tomaten","Erdbeeren","Salat","Gurke","Protein-Joghurt","Wraps","Monster Energy","Red Bull","Tortellini","Reibekäse light","Parmesan","Hähnchen-Minutenschnitzel","Hähnchenbrust","Steak mariniert","Putenschnitzel","Cola Zero","Magerquark","Hüttenkäse","Proteinriegel"];
+if(typeof ST.plz!=="string") ST.plz="";
+if(!Array.isArray(ST.stores)) ST.stores=["REWE","Lidl","Penny"];
+if(!Array.isArray(ST.wish)) ST.wish=DEFWISH.slice();
+function setHtml(){
+  const st=ST.stores||[];
+  return `<h3 class="sec">Angebote und Einkauf</h3>
+  <p class="note" style="margin-top:0">Damit die Wochen-Aufgabe passende Angebote in deiner Nähe findet.</p>
+  <div class="frm"><label class="full">Postleitzahl<input id="st-plz" inputmode="numeric" maxlength="5" placeholder="z. B. 76133" value="${esc(ST.plz||"")}"></label>
+  <div class="full"><div style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:6px">Läden, bei denen ihr einkauft</div><div class="ing">${ALLSTORES.map(s=>`<button data-stor="${s}" aria-pressed="${st.includes(s)}">${s}</button>`).join("")}</div></div></div>`;
+}
+const _hh5=hhHtml;
+hhHtml=function(){
+  const h=_hh5(), marker='<h3 class="sec">Tagebuch sichern</h3>';
+  return h.includes(marker)?h.replace(marker,()=>setHtml()+marker):h.replace(/<\/div>$/,()=>setHtml()+"</div>");
+};
+document.addEventListener("input",ev=>{
+  if(ev.target.id==="st-plz"){const v=ev.target.value.replace(/\D/g,"").slice(0,5);if(v!==ev.target.value)ev.target.value=v;ST.plz=v;persist();}
+  if(ev.target.id==="st-wish"){ST.wish=ev.target.value.split(String.fromCharCode(10)).map(x=>x.trim()).filter(Boolean);persist();}
+});
+document.addEventListener("click",ev=>{
+  const t=ev.target.closest("button"); if(!t||pm!=="H"||pnl.hidden||!t.dataset.stor) return;
+  const s=t.dataset.stor, a=ST.stores||(ST.stores=[]), i=a.indexOf(s);
+  if(i>=0) a.splice(i,1); else a.push(s);
+  persist(); t.setAttribute("aria-pressed",String(i<0));
+});
 
 render();
 </script>
