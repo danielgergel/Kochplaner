@@ -1,0 +1,8 @@
+{
+  "name": "kochplaner",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/ocr-text.test.js tests/validate.test.js"
+  }
+}
