@@ -6,6 +6,7 @@ import { estimateRecipe } from "./nutrition.js";
 import { NSVIDEO } from "./data/wake.js";
 import { showPanel, closePanel, setDiceTimer, clearDiceTimer } from "./panels.js";
 import { parseRecipeText } from "./ocr-text.js";
+import { badgeOf, haystack, idNumber } from "./recipe-badge.js";
 
 const ORD = "FMAISPEX";
 export const GROUPS = ["Alle","★ Favoriten","Frühstück","Hauptmahlzeit","Snack & Beilage","Dessert"];
@@ -29,7 +30,7 @@ export function rebuildAll(){
   for (const k in catalog.all) if (k[0] === "X") delete catalog.all[k];
   (ST.cust || []).forEach(r => { catalog.all[r.id] = r; });
   catalog.ALL = Object.values(catalog.all).sort((a, b) => a.id[0] === b.id[0]
-    ? parseInt(a.id.slice(1), 10) - parseInt(b.id.slice(1), 10)
+    ? idNumber(a.id) - idNumber(b.id)
     : ORD.indexOf(a.id[0]) - ORD.indexOf(b.id[0]));
   clearLabels();
   catalog.ALL.forEach(r => labelsOf(r.id));
@@ -86,17 +87,17 @@ export function letSleep(){
 
 function row(r){
   const n = ST.sel[r.id] || 0;
-  return `<div class="rc"><button class="rb" data-open="${r.id}"><span class="top"><span class="id">${r.id}</span><b>${esc(r.n)}</b></span><span class="meta">${metaOf(r)}</span></button><button class="add" data-add="${r.id}" aria-pressed="${n > 0}" aria-label="${n > 0 ? "Aus Plan nehmen" : "Zum Plan hinzufügen"}">${n > 0 ? (n > 1 ? n + "×" : "✓") : "+"}</button></div>`;
+  return `<div class="rc"><button class="rb" data-open="${r.id}"><span class="top"><span class="id">${esc(badgeOf(r.id, ST.cust))}</span><b>${esc(r.n)}</b></span><span class="meta">${metaOf(r)}</span></button><button class="add" data-add="${r.id}" aria-pressed="${n > 0}" aria-label="${n > 0 ? "Aus Plan nehmen" : "Zum Plan hinzufügen"}">${n > 0 ? (n > 1 ? n + "×" : "✓") : "+"}</button></div>`;
 }
 export function listHtml(){
   const q = ui.fq.trim().toLowerCase();
   let rows;
   if (ui.fg === FAVG) {
-    rows = catalog.ALL.filter(r => starsOf(r.id) > 0 && (!q || (r.n + " " + r.id).toLowerCase().includes(q)))
+    rows = catalog.ALL.filter(r => starsOf(r.id) > 0 && (!q || haystack(r, ST.cust).includes(q)))
       .sort((a, b) => starsOf(b.id) - starsOf(a.id) || a.n.localeCompare(b.n, "de"));
     if (!rows.length) return '<p class="empty">Noch keine Favoriten. Öffne ein Rezept und gib ihm 1 bis 3 Sterne.</p>';
   } else {
-    rows = catalog.ALL.filter(r => (ui.fg === "Alle" || grp(r) === ui.fg) && (!q || (r.n + " " + r.id).toLowerCase().includes(q)));
+    rows = catalog.ALL.filter(r => (ui.fg === "Alle" || grp(r) === ui.fg) && (!q || haystack(r, ST.cust).includes(q)));
     if (!rows.length) return '<p class="empty">Kein Rezept gefunden.</p>';
   }
   return rows.map(row).join("");
@@ -116,7 +117,7 @@ export function detailHtml(id){
   if (r.cust) extra += `<div class="drow"><button class="btn" data-cred="${id}">Bearbeiten</button><button class="btn warn" data-crdel="${id}">Löschen</button></div>`;
   return `<div class="dtop"><div class="in"><button class="back" id="back">Zurück</button><span class="wk" id="wk">Bildschirm wird geprüft</span></div></div>
   <div class="dbody"><h2>${esc(r.n)}</h2>
-   <div class="tags"><span class="tag">${r.id}</span><span class="tag">${r.k} kcal${r.u && /pro /.test(r.u) ? "" : " pro Person"}</span><span class="tag">${r.p} g Eiweiß${r.u && /pro /.test(r.u) ? "" : " pro Person"}</span><span class="tag">${esc(r.t)}</span></div>
+   <div class="tags"><span class="tag">${esc(badgeOf(r.id, ST.cust))}</span><span class="tag">${r.k} kcal${r.u && /pro /.test(r.u) ? "" : " pro Person"}</span><span class="tag">${r.p} g Eiweiß${r.u && /pro /.test(r.u) ? "" : " pro Person"}</span><span class="tag">${esc(r.t)}</span></div>
    ${r.u ? `<div class="meta" style="margin-bottom:4px">${esc(r.u)}</div>` : ""}
    ${stars}
    <h3 class="sec">Zutaten (${r.ns ? esc(r.pt) : "für 2 Personen"})</h3>
@@ -172,7 +173,7 @@ function resHtml(){
   if (!rows.length) return '<p class="empty">Dazu passt noch nichts. Wähle mehr Zutaten aus.</p>';
   return rows.map(x => {
     const n = ST.sel[x.r.id] || 0;
-    return `<div class="rc"><button class="rb" data-fo="${x.r.id}"><span class="top"><span class="id">${x.r.id}</span><b>${esc(x.r.n)}</b></span><span class="meta">${metaOf(x.r)}</span>${x.m.length ? `<span class="fmiss">fehlt: ${esc(x.m.join(", "))}</span>` : '<span class="fok">Alles da</span>'}</button><button class="add" data-fa="${x.r.id}" aria-pressed="${n > 0}" aria-label="${n > 0 ? "Aus Plan nehmen" : "Zum Plan hinzufügen"}">${n > 0 ? "✓" : "+"}</button></div>`;
+    return `<div class="rc"><button class="rb" data-fo="${x.r.id}"><span class="top"><span class="id">${esc(badgeOf(x.r.id, ST.cust))}</span><b>${esc(x.r.n)}</b></span><span class="meta">${metaOf(x.r)}</span>${x.m.length ? `<span class="fmiss">fehlt: ${esc(x.m.join(", "))}</span>` : '<span class="fok">Alles da</span>'}</button><button class="add" data-fa="${x.r.id}" aria-pressed="${n > 0}" aria-label="${n > 0 ? "Aus Plan nehmen" : "Zum Plan hinzufügen"}">${n > 0 ? "✓" : "+"}</button></div>`;
   }).join("");
 }
 function fridgeHtml(){
@@ -222,7 +223,7 @@ function dpool(){
 }
 function dshow(r, fin){
   const n = ST.sel[r.id] || 0;
-  $("#dres").innerHTML = `<div class="dice-card"><span class="id">${r.id}</span><b>${esc(r.n)}</b><span class="meta">${metaOf(r)}</span></div>` +
+  $("#dres").innerHTML = `<div class="dice-card"><span class="id">${esc(badgeOf(r.id, ST.cust))}</span><b>${esc(r.n)}</b><span class="meta">${metaOf(r)}</span></div>` +
     (fin ? `<div class="dice-acts"><button class="btn pri" data-do="${r.id}">Rezept ansehen</button><button class="btn" data-da="${r.id}">${n ? "Im Plan ✓" : "Zum Plan"}</button></div>` : "");
 }
 function roll(){
