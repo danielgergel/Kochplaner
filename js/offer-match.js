@@ -44,7 +44,7 @@ export function normOffer(s){
 }
 
 function tokensOf(s){
-  return normOffer(s).split(" ").filter(w => w && w.length > 1 && !STOP.has(w) && !/^\d+$/.test(w));
+  return normOffer(s).split(" ").filter(w => w && w.length > 1 && !STOP.has(w) && !/^\d+$/.test(w) && !/^\d+x\d+/.test(w));
 }
 
 function groupOf(head){

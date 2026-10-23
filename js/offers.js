@@ -1,7 +1,8 @@
 import { ST, ui, persist } from "./state.js";
 import { esc, toast, dkey } from "./util.js";
 import { CATS, shopList } from "./shopcalc.js";
-import { bestOffers } from "./offer-match.js";
+import { offerMatches } from "./offer-match.js";
+import { shapeOffer, dedupeOffers, sortOffers, offerWhen, safeOfferUrl } from "../offers-worker/shape.js";
 
 export const DEFAULT_OFFER_URL = "https://kochplaner-angebote.danielgergel.workers.dev";
 const FRESH_MS = 12 * 60 * 60 * 1000;
@@ -85,10 +86,55 @@ function manualHits(item){
   }));
 }
 
-export function hitsFor(item){
+function asStored(row){
+  return {
+    s: row.store || "",
+    n: row.name || "",
+    pr: row.price == null ? "" : String(row.price),
+    unit: row.unit || "",
+    up: row.unitPrice == null ? "" : String(row.unitPrice),
+    upu: row.unitPriceUnit || "",
+    u: row.until || "",
+    from: row.from || "",
+    url: row.url || "",
+    note: row.note || "",
+  };
+}
+
+export function normalizeHit(hit, zip){
+  if (!hit || hit.manual) return hit;
+  const shaped = shapeOffer({
+    price: hit.pr != null && hit.pr !== "" ? hit.pr : hit.price,
+    referencePrice: hit.up != null && hit.up !== "" ? hit.up : hit.unitPrice,
+    description: hit.n || hit.name || "",
+    externalUrl: hit.url || "",
+    fallbackUnit: hit.unit || "",
+    from: hit.from || "",
+    until: hit.u || hit.until || "",
+    validityDates: [{ from: hit.from || "", to: hit.u || hit.until || "" }],
+  }, "", hit.s || hit.store || "", zip || "");
+  shaped.url = safeOfferUrl(shaped.url, shaped.name, zip || "");
+  return asStored(shaped);
+}
+
+export function presentOffers(item, rows, today, zip){
+  const hits = (rows || []).filter(r => offerMatches(item, r.n || r.name || ""));
+  const clean = dedupeOffers(hits.map(r => {
+    const n = normalizeHit(r, zip);
+    return {
+      store: n.s, name: n.n, price: n.pr === "" ? null : Number(String(n.pr).replace(",", ".")),
+      unitPrice: n.up === "" ? null : Number(String(n.up).replace(",", ".")),
+      from: n.from || "", until: n.u || "", url: n.url, note: n.note,
+      _hit: n,
+    };
+  }));
+  return sortOffers(clean, today).slice(0, 3).map(x => x._hit);
+}
+
+export function hitsFor(item, today){
   const box = cacheBox();
   const auto = Array.isArray(box.byItem[item]) ? box.byItem[item] : [];
-  return bestOffers(item, auto.concat(manualHits(item)), 3);
+  return presentOffers(item, auto.concat(manualHits(item)), today || dkey(new Date()), zipOf());
 }
 
 function online(){
@@ -100,10 +146,12 @@ export function itemOfferHtml(item, hits, opts){
   const rows = (hits || []).map(h => {
     const price = euro(h.pr);
     const grund = h.up ? "Grundpreis " + euro(h.up) + (h.upu ? "/" + esc(h.upu) : "") : "";
+    const when = offerWhen(h.from, o.today || "");
     const bits = [h.s ? esc(h.s) : "", esc(h.n || "")].filter(Boolean).join(" · ");
-    const meta = [price, h.unit ? esc(h.unit) : "", grund, untilText(h.u)].filter(Boolean).join(" · ");
+    const meta = [price, h.unit ? esc(h.unit) : "", grund, when, untilText(h.u)].filter(Boolean).join(" · ");
+    const note = h.note ? `<span class="meta" style="display:block">Hinweis: ${esc(h.note)}</span>` : "";
     const link = h.url ? ` <a class="chipb" href="${esc(h.url)}" target="_blank" rel="noopener">Angebot</a>` : "";
-    return `<span class="meta" style="display:block">${bits}</span><span class="meta" style="display:block">${meta}${link}</span>`;
+    return `<span class="meta" style="display:block">${bits}</span>${note}<span class="meta" style="display:block">${meta}${link}</span>`;
   }).join("");
   let links = "";
   if (o.fallback) {
@@ -130,6 +178,7 @@ export function offersHtml(){
   const failed = new Set(box.failed || []);
   const body = items.length
     ? items.map((item, i) => itemOfferHtml(item, hitsFor(item), {
+        today: dkey(new Date()),
         fallback: err || failed.has(item) || i >= MAX_ITEMS,
         skipped: i >= MAX_ITEMS && !box.byItem[item],
         zip,
@@ -155,9 +204,11 @@ function remember(data, items){
       up: r.unitPrice == null ? "" : String(r.unitPrice).slice(0, 24),
       upu: String(r.unitPriceUnit || "").slice(0, 12),
       u: /^\d{4}-\d{2}-\d{2}$/.test(r.until || "") ? r.until : "",
+      from: /^\d{4}-\d{2}-\d{2}$/.test(r.from || "") ? r.from : "",
       url: typeof r.url === "string" && /^https:\/\//.test(r.url) ? r.url.slice(0, 300) : "",
+      note: String(r.note || "").slice(0, 80),
     }));
-    byItem[item] = bestOffers(item, raw, 3);
+    byItem[item] = presentOffers(item, raw, dkey(new Date()), zipOf());
   });
   ST.aoffers = { at: dkey(new Date()), ts: Date.now(), byItem, failed, items: [] };
   persist();
