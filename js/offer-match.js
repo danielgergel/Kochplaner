@@ -11,6 +11,14 @@ const STOP = new Set([
   "xxl","mini","gross","grosse","grosser","klein","kleine","pro","pack",
 ]);
 
+/* Mengenangaben, Verpackung und Beschreibungen, die nicht der Artikel sind. */
+const EXTRA = new Set([
+  "fett","packg","pckg","je","sorte","sorten","versch","gekuehlt","gekuehlte",
+  "gekuehlter","gekuehltes","flasche","flaschen","fl","pfand","zzgl","hinweis",
+  "entspricht","haltbar","haltbare","haltbarer","haltbares","tiefgefroren",
+  "tiefgekuehlt","normalpreis","preis","standardpackung","teilstueck","teilstuecke",
+]);
+
 const TAIL = new Set([
   "marinade","mariniert","gewuerzt","gewuerzte","kraeuter","natur",
   "geraeuchert","gepockelt","gepökelt",
@@ -25,11 +33,20 @@ const GROUPS = [
 ];
 
 const BAN = {
-  milch: ["hafermilch","mandelmilch","kokosmilch","sojamilch","buttermilch","kondensmilch","milchschnitte","muellermilch","reisdrink"],
-  vollmilch: ["hafermilch","mandelmilch","kokosmilch","sojamilch","buttermilch","kondensmilch","milchschnitte","muellermilch"],
+  milch: ["hafermilch","mandelmilch","kokosmilch","sojamilch","buttermilch","kondensmilch","milchschnitte","muellermilch","reisdrink","milchshake","milchmischgetraenk","shake"],
+  vollmilch: ["hafermilch","mandelmilch","kokosmilch","sojamilch","buttermilch","kondensmilch","milchschnitte","muellermilch","milchshake","milchmischgetraenk","shake"],
   reis: ["reiswaffel","reiswaffeln","milchreis","reisdrink","reiscracker","reisnudel","reisnudeln"],
   haehnchenbrust: ["minutenschnitzel","nugget","nuggets","haehnchenfluegel","haehnchenschenkel"],
 };
+
+/* Getrennte Schreibweisen der Ausschlussliste, z. B. „Milch Reis“, „Reis Waffeln“. */
+const SPLIT = {
+  milch: [["milch","reis"],["hafer","milch"],["mandel","milch"],["kokos","milch"],["soja","milch"],["butter","milch"],["kondens","milch"]],
+  vollmilch: [["hafer","milch"],["mandel","milch"],["kokos","milch"],["soja","milch"],["butter","milch"],["kondens","milch"]],
+  reis: [["milch","reis"],["reis","waffel"],["reis","waffeln"],["reis","cracker"],["reis","nudel"],["reis","nudeln"]],
+};
+
+const APP_WORD = new Set(["app","plus","edeka","lidl","rewe","penny","aldi","kaufland","netto"]);
 
 export function normOffer(s){
   return String(s || "")
@@ -43,8 +60,20 @@ export function normOffer(s){
     .trim();
 }
 
+function rawTokens(s){
+  return normOffer(s).split(" ").filter(Boolean);
+}
+
+function isQty(w){
+  return /^\d+$/.test(w) || /^\d+x\d+/.test(w) || /^\d+(ml|l|kg|g|mg|stk|er|cm)$/.test(w);
+}
+
 function tokensOf(s){
-  return normOffer(s).split(" ").filter(w => w && w.length > 1 && !STOP.has(w) && !/^\d+$/.test(w) && !/^\d+x\d+/.test(w));
+  return rawTokens(s).filter(w => w.length > 1 && !STOP.has(w) && !isQty(w));
+}
+
+function keepToken(w){
+  return w.length > 1 && !STOP.has(w) && !EXTRA.has(w) && !isQty(w);
 }
 
 function groupOf(head){
@@ -52,19 +81,46 @@ function groupOf(head){
   return [head];
 }
 
-function banned(head, token){
+function banList(head){
   const list = new Set();
   for (const h of groupOf(head)) (BAN[h] || []).forEach(b => list.add(b));
   (BAN[head] || []).forEach(b => list.add(b));
-  for (const b of list) if (token === b || token.startsWith(b)) return true;
+  return list;
+}
+
+function isBannedToken(token, list){
+  for (const b of list) {
+    if (token === b) return true;
+    if (b.length >= 6 && token.startsWith(b)) return true;
+  }
+  return false;
+}
+
+function splitBanned(head, words){
+  const pairs = [];
+  for (const h of groupOf(head)) (SPLIT[h] || []).forEach(p => pairs.push(p));
+  (SPLIT[head] || []).forEach(p => pairs.push(p));
+  for (let i = 0; i < words.length - 1; i++) {
+    for (const [a, b] of pairs) {
+      if (words[i] === a && (words[i + 1] === b || words[i + 1].startsWith(b))) return true;
+    }
+  }
+  return false;
+}
+
+function prepRest(rest){
+  for (const p of PREP) if (rest === p || rest.startsWith(p)) return true;
   return false;
 }
 
 function tokenIs(token, accepted){
   if (accepted.has(token)) return true;
   for (const a of accepted) {
-    if (!token.startsWith(a) || token === a) continue;
-    if (a.length >= 8 && PREP.has(token.slice(a.length))) return true;
+    if (token.startsWith(a) && token.length > a.length) {
+      const rest = token.slice(a.length);
+      if (a.length >= 8 && prepRest(rest)) return true;
+    }
+    if (token.endsWith(a) && token.length > a.length + 2) return true;
   }
   return false;
 }
@@ -82,15 +138,32 @@ export function headNoun(label){
   return offerHead(tokens);
 }
 
-/** true, wenn der Angebotsname denselben Kopf wie der Artikel hat. */
+function mainPart(part){
+  const i = part.indexOf("mit");
+  if (i <= 0) return part;
+  const next = part[i + 1] || "";
+  if (APP_WORD.has(next)) return part;
+  return part.slice(0, i);
+}
+
+/** true, wenn ein bedeutendes Wort dem Artikel entspricht. Menge, Fett und Packung zählen nicht. */
 export function offerMatches(item, productName){
   const head = headNoun(item);
   if (!head) return false;
-  const words = tokensOf(productName);
+  const raw = rawTokens(productName);
+  const words = raw.filter(keepToken);
   if (!words.length) return false;
-  if (words.some(w => banned(head, w))) return false;
+  const list = banList(head);
+  if (words.some(w => isBannedToken(w, list)) || splitBanned(head, words)) return false;
   const accepted = new Set(groupOf(head));
-  return tokenIs(offerHead(words), accepted);
+  const parts = [];
+  let cur = [];
+  for (const w of raw) {
+    if (w === "oder") { parts.push(cur); cur = []; }
+    else cur.push(w);
+  }
+  parts.push(cur);
+  return parts.some(part => mainPart(part).filter(keepToken).some(w => tokenIs(w, accepted)));
 }
 
 export function priceOf(offer){
