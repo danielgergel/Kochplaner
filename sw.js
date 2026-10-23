@@ -1,11 +1,13 @@
 /* Service Worker für den Kochplaner: App und Bibliotheken werden zwischengespeichert, damit sie auch ohne Internet starten. */
-const V = "kochplaner-v8";
+const V = "kochplaner-v9";
 const CORE = [
   "./",
   "index.html",
   "apple-touch-icon.png",
   "css/app.css",
   "js/app.js",
+  "js/theme-boot.js",
+  "js/theme.js",
   "js/state.js",
   "js/util.js",
   "js/validate.js",

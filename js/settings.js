@@ -4,11 +4,18 @@ import { showPanel } from "./panels.js";
 import { newCode, setHousehold, leaveHousehold, useLocalOnly, hhUrl, diaryCode, diaryCodeVisible, setDiaryCodeVisible, startDiaryBackup, joinDiary, stopDiaryBackup } from "./sync.js";
 import { exportBackup, parseBackup, applyBackup, summaryOf } from "./backup.js";
 import { rebuildAll } from "./recipes.js";
+import { readTheme, saveTheme } from "./theme.js";
 
-const APPV = "22.10.2026, Stand 16";
+const APPV = "23.10.2026, Stand 17";
 const ALLSTORES = ["REWE","Lidl","Penny","Aldi","Edeka","Kaufland","Netto"];
 let pending = null;
 
+function themeHtml(){
+  const cur = readTheme();
+  const opts = [["auto", "Wie Handy"], ["light", "Hell"], ["dark", "Dunkel"]];
+  const buttons = opts.map(([id, label]) => `<button type="button" role="tab" data-theme-set="${id}" aria-selected="${cur === id}">${label}</button>`).join("");
+  return `<h3 class="sec" style="margin-top:4px">Darstellung</h3><div class="seg" id="theme-seg" role="tablist" aria-label="Darstellung">${buttons}</div>`;
+}
 function setHtml(){
   const st = ST.stores || [];
   return `<h3 class="sec">Angebote und Einkauf</h3>
@@ -52,7 +59,7 @@ export function hhHtml(){
    <input id="hh-c" class="finp" placeholder="Code oder Link einfügen" autocapitalize="none" autocomplete="off">
    <div class="stack"><button class="btn" data-hhjoin>Beitreten</button><button class="btn" data-hhlocal>Nur auf diesem Handy nutzen</button></div>`;
   return `<div class="dtop"><div class="in"><button class="back" data-pc>${HH ? "Schließen" : "Später"}</button></div></div>
-  <div class="dbody"><h2>Einstellungen</h2><h3 class="sec" style="margin-top:4px">Haushalt und Teilen</h3>${household}
+  <div class="dbody"><h2>Einstellungen</h2>${themeHtml()}<h3 class="sec">Haushalt und Teilen</h3>${household}
   ${setHtml()}
   ${dcHtml()}
   <h3 class="sec">Datenquellen</h3><p class="note" style="margin-top:0">Gescannte Produkte: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL). Die Werte beim Schnell-Eintragen sind Durchschnittswerte und können abweichen.</p>
@@ -96,6 +103,11 @@ export function bindSettings(){
     if (t.id === "bhh") { pending = null; openHh(); return; }
     if (d.reload !== undefined) { location.reload(); return; }
     if (ui.pm !== "H" || document.querySelector("#pnl").hidden) return;
+    if (d.themeSet) {
+      const mode = saveTheme(d.themeSet);
+      document.querySelectorAll("#theme-seg button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.themeSet === mode)));
+      return;
+    }
     if (d.hhnew !== undefined) { setHousehold(newCode(), false); return; }
     if (d.hhjoin !== undefined) {
       const m = ($("#hh-c") || { value:"" }).value.match(/([a-z0-9]{16,64})\s*$/i);

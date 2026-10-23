@@ -1,3 +1,4 @@
+import "./theme.js";
 import { catalog, ST, HH, ui, persist } from "./state.js";
 import { $, toast, dkey } from "./util.js";
 import { loadBuiltinRecipes } from "./data/recipes.js";
