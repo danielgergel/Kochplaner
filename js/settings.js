@@ -1,12 +1,12 @@
 import { ST, HH, ui, persist } from "./state.js";
 import { $, esc, toast, copyTxt } from "./util.js";
 import { showPanel } from "./panels.js";
-import { newCode, setHousehold, leaveHousehold, useLocalOnly, hhUrl, diaryCode, diaryCodeVisible, setDiaryCodeVisible, startDiaryBackup, joinDiary, stopDiaryBackup } from "./sync.js";
+import { newCode, setHousehold, leaveHousehold, useLocalOnly, hhUrl, diaryCode, diaryCodeVisible, setDiaryCodeVisible, startDiaryBackup, joinDiary, stopDiaryBackup, syncStatusText, diaryStatusText } from "./sync.js";
 import { exportBackup, parseBackup, applyBackup, summaryOf } from "./backup.js";
 import { rebuildAll } from "./recipes.js";
 import { readTheme, saveTheme } from "./theme.js";
 
-const APPV = "23.10.2026, Stand 17";
+const APPV = "23.10.2026, Stand 19";
 const ALLSTORES = ["REWE","Lidl","Penny","Aldi","Edeka","Kaufland","Netto"];
 let pending = null;
 
@@ -25,9 +25,8 @@ function setHtml(){
 }
 function dcHtml(){
   const DC = diaryCode();
-  const st = ui.dState === "online" ? "Verbunden, alles gesichert." : ui.dState === "error" ? "Verbindung gestört, wird später gesichert." : "Wird gesichert, sobald eine Verbindung besteht.";
   return `<h3 class="sec">Tagebuch sichern</h3>` + (DC
-    ? `<p class="note" style="margin-top:0">Dein Tagebuch wird automatisch in der Cloud gesichert, geschützt durch deinen eigenen Code. ${st}</p>
+    ? `<p class="note" style="margin-top:0">Dein Tagebuch wird automatisch in der Cloud gesichert, geschützt durch deinen eigenen Code. <span id="dy-st">${esc(diaryStatusText())}</span></p>
     <div class="code">${diaryCodeVisible() ? esc(DC) : "••••••••••••••••••••"}</div>
     <div class="stack"><button class="btn" data-dcshow>${diaryCodeVisible() ? "Code verbergen" : "Code anzeigen"}</button><button class="btn" data-dccopy>Code kopieren</button><button class="btn warn" id="dcoff">Sicherung beenden</button></div>
     <p class="note">Schreib dir den Code auf oder mach ein Foto. Ohne ihn kommst du auf einem neuen Handy nicht an dein Tagebuch.</p>`
@@ -49,7 +48,7 @@ function backupHtml(){
 export function hhHtml(){
   const cloud = HH && HH.mode === "cloud" && HH.code;
   const household = cloud
-    ? `<p class="note" style="margin-top:0">Alle, die diesen Code haben, sehen denselben Plan, dieselbe Einkaufsliste, denselben Kühlschrank und dieselben eigenen Rezepte, sofort auf allen Handys. ${window.FB ? (ui.syncState === "online" ? "Verbunden." : ui.syncState === "error" ? "Verbindung gestört, die Änderungen werden später gesendet." : "Verbinde …") : "Keine Verbindung zum Server, die App arbeitet lokal weiter."}</p>
+    ? `<p class="note" style="margin-top:0">Alle, die diesen Code haben, sehen denselben Plan, dieselbe Einkaufsliste, denselben Kühlschrank und dieselben eigenen Rezepte, sofort auf allen Handys. <span id="hh-st">${esc(syncStatusText())}</span></p>
    <div class="code">${esc(HH.code)}</div>
    <div class="stack"><button class="btn pri" data-hhshare>Link teilen</button><button class="btn" data-hhcopy>Code kopieren</button><button class="btn warn" id="hhleave">Haushalt verlassen</button></div>
    <p class="note">Tipp: Deine Freundin öffnet den geteilten Link auf ihrem Handy. Dann ist sie automatisch verbunden. Nur wer den Code kennt, kommt an eure Daten. Das Tagebuch bleibt auf dem jeweiligen Handy.</p>`

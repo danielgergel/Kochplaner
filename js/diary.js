@@ -1,6 +1,7 @@
 import { catalog, DY, ST, ui, dsave, persist } from "./state.js";
 import { $, esc, toast, f1, dkey, dlabel, WDSHORT } from "./util.js";
 import { grp } from "./recipes.js";
+import { haystack } from "./recipe-badge.js";
 import { parsePiece, calcPiece } from "./nutrition.js";
 import { showPanel } from "./panels.js";
 
@@ -148,7 +149,7 @@ function fold(title, body){
 function dyResHtml(){
   const q = ui.dyq.trim().toLowerCase();
   let rows;
-  if (q) rows = catalog.ALL.filter(r => (r.n + " " + r.id).toLowerCase().includes(q)).slice(0, 8);
+  if (q) rows = catalog.ALL.filter(r => haystack(r, ST.cust).includes(q)).slice(0, 8);
   else {
     const seen = new Set();
     rows = [];
@@ -170,7 +171,6 @@ export function dyHtml(){
   <div class="dnav"><button data-dyd="-1" aria-label="Vorheriger Tag">‹</button><b>${dlabel(ui.dyk)}</b><button data-dyd="1" aria-label="Nächster Tag">›</button></div>
   <div class="tot"><div><div class="row1"><b>${Math.round(t.k)} kcal</b><span>Ziel ${G.k} · noch ${Math.round(G.k - t.k)}</span></div>${barHtml(t.k, G.k)}</div>
    <div><div class="row1"><b>${f1(t.p)} g Eiweiß</b><span>Ziel ${G.p} · noch ${f1(G.p - t.p)}</span></div>${barHtml(t.p, G.p, true)}</div></div>
-  ${weekChartHtml()}
   <h3 class="sec">Schnell eintragen</h3>
   <input id="qk" class="finp" placeholder="z. B. 4 Kaffee, 2 Brötchen mit Butter, Pommes" autocomplete="off" autocapitalize="none" aria-label="Was hast du gegessen oder getrunken?">
   <div id="qkp">${qHtml()}</div>
@@ -185,6 +185,7 @@ export function dyHtml(){
    <label class="chk2 full"><input type="checkbox" id="dy-s" checked>In „Meine Lebensmittel“ merken</label>
    <button class="btn pri full" data-dyown>Eintragen</button></div>`)}
   ${foods}
+  ${weekChartHtml()}
   </div>`;
 }
 
