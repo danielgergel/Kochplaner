@@ -1,6 +1,8 @@
 /* Inoffizieller Abruf von marktguru. Der Schlüssel bleibt hier, nie in der App.
    marktguru kann die Schnittstelle jederzeit ändern. */
 
+import { shapeOffer, dedupeOffers, sortOffers, todayBerlin } from "./shape.js";
+
 const API_BASE = "https://api.marktguru.de/api/v1";
 const SITE = "https://www.marktguru.de/";
 const UA = "KochplanerAngebote/1";
@@ -42,69 +44,8 @@ export function storeAllowed(name, wanted){
   return set.has(c) ? c : "";
 }
 
-function day(v){
-  if (!v || typeof v !== "string") return "";
-  const m = v.match(/^(\d{4}-\d{2}-\d{2})/);
-  return m ? m[1] : "";
-}
-
-function num(v){
-  const n = typeof v === "number" ? v : parseFloat(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-function packText(offer){
-  const unit = offer && offer.unit && (offer.unit.shortName || offer.unit.name) || "";
-  const vol = num(offer && offer.volume);
-  const qty = num(offer && offer.quantity);
-  const amount = vol && vol > 0 ? vol : (qty && qty > 0 ? qty : null);
-  if (amount && unit) {
-    const shown = Math.round(amount * 1000) / 1000;
-    return String(shown).replace(".", ",") + " " + unit;
-  }
-  const desc = String(offer && offer.description || "");
-  const m = desc.match(/(\d+(?:[.,]\d+)?)\s*(kg|g|l|ml|stück|stueck|stk)\b/i);
-  return m ? m[1] + " " + m[2] : (unit || "");
-}
-
-export function unitPriceOfRaw(offer){
-  const ref = num(offer && offer.referencePrice);
-  const unit = offer && offer.unit && (offer.unit.shortName || offer.unit.name) || "";
-  if (ref && ref > 0) return { unitPrice: Math.round(ref * 100) / 100, unitPriceUnit: unit };
-  const price = num(offer && offer.price);
-  const vol = num(offer && offer.volume);
-  if (price && price > 0 && vol && vol > 0 && unit) {
-    return { unitPrice: Math.round((price / vol) * 100) / 100, unitPriceUnit: unit };
-  }
-  return { unitPrice: null, unitPriceUnit: "" };
-}
-
-export function offerLink(offer, query, zip){
-  const ext = offer && offer.externalUrl;
-  if (typeof ext === "string" && /^https:\/\//.test(ext)) return ext.slice(0, 300);
-  const q = new URLSearchParams({ q: query || "", zipCode: zip || "" });
-  return "https://www.marktguru.de/search?" + q.toString();
-}
-
 export function compactOffer(offer, item, store, zip){
-  const brand = offer && offer.brand && offer.brand.name;
-  const product = offer && offer.product && offer.product.name;
-  const name = [brand, product, offer && offer.description].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 160);
-  const price = num(offer && offer.price);
-  const dates = (offer && offer.validityDates && offer.validityDates[0]) || {};
-  const up = unitPriceOfRaw(offer);
-  return {
-    item: String(item || "").slice(0, 80),
-    store,
-    name,
-    price: price == null ? null : Math.round(price * 100) / 100,
-    unit: packText(offer).slice(0, 40),
-    unitPrice: up.unitPrice,
-    unitPriceUnit: up.unitPriceUnit,
-    from: day(dates.from),
-    until: day(dates.to),
-    url: offerLink(offer, name || item, zip),
-  };
+  return shapeOffer(offer, item, store, zip);
 }
 
 function json(body, status, request){
@@ -315,8 +256,7 @@ function rowsFor(item, rawOffers, wanted, zip){
     }
     for (const store of stores) rows.push(compactOffer(offer, item, store, zip));
   }
-  rows.sort((a, b) => (a.unitPrice == null ? 1e9 : a.unitPrice) - (b.unitPrice == null ? 1e9 : b.unitPrice));
-  return rows.slice(0, PER_ITEM);
+  return sortOffers(dedupeOffers(rows), todayBerlin()).slice(0, PER_ITEM);
 }
 
 export default {

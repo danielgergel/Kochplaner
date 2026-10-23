@@ -4,7 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { offerMatches, bestOffers, rankOffers } from "../js/offer-match.js";
 import { canonicalStore, storeAllowed, compactOffer } from "../offers-worker/worker.js";
-import { itemOfferHtml } from "../js/offers.js";
+import { offerWhen, dedupeOffers, sortOffers } from "../offers-worker/shape.js";
+import { itemOfferHtml, presentOffers } from "../js/offers.js";
 import { sanitizeAoffers, sanitizeOfferUrl } from "../js/validate.js";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -89,6 +90,97 @@ test("Worker filtert Läden und rechnet den Grundpreis", () => {
   assert.equal(row.until, "2026-10-25");
   assert.match(row.url, /^https:\/\//);
   assert.match(row.name, /Vollmilch/);
+});
+
+test("Mehrfachpack, Packungspreis und Werbelink an echten Beispielen", () => {
+  const milbona = compactOffer({
+    price: 8.5, referencePrice: 0.71,
+    description: "12x1 l",
+    product: { name: "Haltbare Fettarme Milch" }, brand: { name: "Milbona" },
+    unit: { shortName: "l" }, volume: 1, quantity: 12,
+    validityDates: [{ from: "2026-10-25", to: "2026-10-31" }],
+  }, "Milch", "Lidl", "76133");
+  assert.equal(milbona.price, 8.5);
+  assert.match(milbona.unit, /12×1 l/);
+  assert.ok(Math.abs(milbona.unitPrice - 8.5 / 12) < 0.02);
+  assert.equal(milbona.unitPriceUnit, "l");
+
+  const classic = compactOffer({
+    price: 8, referencePrice: 0.67,
+    description: "3,5 % Fett 3,5 % Fett je 1-l-Packg. entspricht pro Packg. 0.79",
+    product: { name: "H-Vollmilch" }, brand: { name: "K-Classic" },
+    unit: { shortName: "l" }, volume: 1,
+    validityDates: [{ from: "2026-10-22", to: "2026-10-24" }],
+  }, "Milch", "Kaufland", "76133");
+  assert.equal(classic.price, 0.79);
+  assert.match(classic.unit, /1 l/);
+  assert.equal(classic.unitPrice, 0.79);
+  assert.doesNotMatch(classic.unit, /12/);
+
+  const tracker = "https://ad.doubleclick.net/ddm/trackclk/N1343045.3361130SEVENONEMEDIA.DE/B34757911.436666463";
+  const landliebe = compactOffer({
+    price: 0.99, referencePrice: 0.99, description: "1-l-Packung",
+    product: { name: "H-Milch" }, brand: { name: "Landliebe" },
+    unit: { shortName: "l" }, volume: 1,
+    externalUrl: tracker,
+    validityDates: [{ from: "2026-10-29", to: "2026-10-31" }],
+  }, "Milch", "Aldi", "76133");
+  assert.doesNotMatch(landliebe.url, /doubleclick/);
+  assert.match(landliebe.url, /^https:\/\/www\.marktguru\.de\/search\?/);
+  assert.match(landliebe.url, /zipCode=76133/);
+
+  const shop = compactOffer({
+    price: 8, referencePrice: 0.67,
+    description: "je 1-l-Packg. entspricht pro Packg. 0.79",
+    product: { name: "H-Vollmilch" }, brand: { name: "K-Classic" },
+    unit: { shortName: "l" }, volume: 1,
+    externalUrl: "https://filiale.kaufland.de/angebote/uebersicht.html?kloffer-articleID=01065725",
+  }, "Milch", "Kaufland", "76133");
+  assert.match(shop.url, /kaufland\.de/);
+
+  const hint = compactOffer({
+    price: 0.99, referencePrice: 0.99,
+    description: "HINWEIS: MIT EDEKA APP 0.88 € 1,5% oder 3,5% Fett, auch frische Milch 3,8% Fett, 1 L",
+    product: { name: "Haltbare Milch" }, brand: { name: "Bärenmarke" },
+    unit: { shortName: "l" }, volume: 1,
+  }, "Milch", "Edeka", "76133");
+  assert.doesNotMatch(hint.name, /HINWEIS/);
+  assert.equal(hint.note, "Mit Edeka-App 0,88 €");
+  assert.equal(hint.price, 0.99);
+});
+
+test("gleiche Angebote fallen zusammen, gültige stehen vor künftigen", () => {
+  const a = compactOffer({
+    price: 0.99, referencePrice: 0.99,
+    description: "HINWEIS: MIT EDEKA APP 0.88 € 1,5% oder 3,5% Fett, auch frische Milch 3,8% Fett, 1 L",
+    product: { name: "Haltbare Milch" }, brand: { name: "Bärenmarke" },
+    unit: { shortName: "l" }, volume: 1,
+    validityDates: [{ from: "2026-10-18", to: "2026-10-24" }],
+  }, "Milch", "Edeka", "76133");
+  const b = compactOffer({
+    price: 0.99, referencePrice: 0.99,
+    description: "HINWEIS: MIT EDEKA APP 0.88 € 1,5%, 3,5% oder Frische Milch 3,8% Fett, 1 L",
+    product: { name: "Haltbare Milch" }, brand: { name: "Bärenmarke" },
+    unit: { shortName: "l" }, volume: 1,
+    validityDates: [{ from: "2026-10-18", to: "2026-10-24" }],
+  }, "Milch", "Edeka", "76133");
+  assert.equal(dedupeOffers([a, b]).length, 1);
+  assert.equal(offerWhen("2026-10-26", "2026-10-23"), "ab Mo.");
+  const later = { ...a, from: "2026-10-26", until: "2026-10-31", unitPrice: 0.5, price: 0.5 };
+  const now = { ...a, from: "2026-10-18", until: "2026-10-24", unitPrice: 1.2, price: 1.2 };
+  const sorted = sortOffers([later, now], "2026-10-23");
+  assert.equal(sorted[0].from, "2026-10-18");
+  assert.equal(sorted[1].from, "2026-10-26");
+  const shown = presentOffers("Milch", [
+    { s: "Lidl", n: "Milbona Haltbare Fettarme Milch 12x1 l", pr: "8.5", unit: "1 l", up: "0.71", upu: "l", from: "2026-10-26", u: "2026-10-31", url: "https://ad.doubleclick.net/ddm/trackclk/x" },
+  ], "2026-10-23", "76133");
+  assert.equal(shown.length, 1);
+  assert.match(shown[0].unit, /12×1 l/);
+  assert.equal(shown[0].pr, "8.5");
+  assert.doesNotMatch(shown[0].url, /doubleclick/);
+  const html = itemOfferHtml("Milch", shown, { today: "2026-10-23" });
+  assert.match(html, /ab Mo\./);
+  assert.match(html, /12×1 l/);
 });
 
 test("die App enthält keinen marktguru-Schlüssel und keine Wochen-Aufgabe", () => {

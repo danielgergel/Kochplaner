@@ -53,4 +53,6 @@ Höchstens 40 Artikel, drei Suchen gleichzeitig. Die Antwort enthält pro Treffe
 
 Schlägt marktguru fehl, kommt HTTP 502 und `"error":"marktguru_unavailable"` oder `"marktguru_unauthorized"`. Die App lässt die alte Liste stehen und öffnet die Suche im Prospekt.
 
+Packungsangaben wie `12x1 l`, `je 1-l-Packg.` und `entspricht pro Packg.` bestimmen Menge und Preis. Der Grundpreis muss zum Preis geteilt durch die Menge passen, sonst wird er neu gerechnet. Werbe- und Tracking-Links (zum Beispiel doubleclick) werden nicht ausgegeben, stattdessen eine marktguru-Suche mit Postleitzahl. Gleiche Treffer fallen zusammen, gültige Angebote stehen vor künftigen.
+
 CORS erlaubt `https://danielgergel.github.io`, `localhost` und `127.0.0.1`.

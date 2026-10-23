@@ -165,11 +165,12 @@ function sanitizeHit(o){
   const s = str(o.s, 40);
   const n = str(o.n, 160);
   if (!s || !n) return null;
-  const out = { s, n, pr: o.pr == null ? "" : String(o.pr).trim().slice(0, 24), unit: str(o.unit, 40), up: "", upu: str(o.upu, 12), u: "", url: "" };
+  const out = { s, n, pr: o.pr == null ? "" : String(o.pr).trim().slice(0, 24), unit: str(o.unit, 40), up: "", upu: str(o.upu, 12), u: "", from: "", url: "", note: str(o.note, 80) };
   const up = asNumber(o.up);
   if (up != null && up >= 0 && up < 100000) out.up = String(Math.round(up * 1000) / 1000);
   if (typeof o.u === "string" && DATE_RE.test(o.u)) out.u = o.u;
-  if (typeof o.url === "string" && /^https:\/\/\S+$/.test(o.url)) out.url = o.url.slice(0, 300);
+  if (typeof o.from === "string" && DATE_RE.test(o.from)) out.from = o.from;
+  if (typeof o.url === "string" && /^https:\/\/\S+$/.test(o.url) && !/doubleclick\.net|\/ddm\/track/i.test(o.url)) out.url = o.url.slice(0, 300);
   return out;
 }
 
