@@ -28,6 +28,57 @@ test("Kopfwort muss passen, Synonyme gelten, falsche Treffer fallen weg", () => 
   assert.equal(offerMatches("Reis", "Basmati Reis 1 kg"), true);
 });
 
+test("echte Angebotsnamen: Füllwörter weg, Shakes und Beilagen bleiben draußen", () => {
+  const yes = [
+    ["Milch", "Bärenmarke Haltbare Milch 3,5/1,5% Fett. Je 1l"],
+    ["Milch", "K-Classic H-Vollmilch 3,5 % Fett je 1-l-Packg. entspricht pro Packg. 0.79"],
+    ["Milch", "Landliebe frische Weidemilch 3,8 % Fett, gekühlt je 1,5-l-Packg."],
+    ["Milch", "Weihenstephan Haltbare Milch 1,5% oder 3,5% Fett, je 1l"],
+    ["Milch", "Minus L Laktosefreie Haltbare Milch 1,5% Fett oder 3,5% Fett, 1 L"],
+    ["Milch", "Milbona Haltbare Fettarme Milch 12x1 l"],
+    ["Hackfleisch", "Mühlenhof Hackfleisch Gemischt, vom Schwein und Rind, je 800-g-Packung"],
+    ["Hackfleisch", "Gut Ponholz Gemischt-Hackfleisch 500 g aus 50% Schwein und 50% Rind"],
+    ["Hackfleisch", "Metzgerfrisch XXL Rinderhackfleisch Je 1 kg"],
+    ["Hackfleisch", "BioBio Bio Rinder Hackfleisch zum Braten 400 g"],
+    ["Hackfleisch", "Metzgerei Wilhelm Brandenburg Hackfleisch gemischt vom Rind und Schwein, je 250-g-Pckg."],
+    ["Bananen", "Chiquita Bananen je kg"],
+    ["Bananen", "Gut & Günstig Bananen aus Costa Rica oder Kolumbien, 1 kg"],
+    ["Bananen", "thisisnobrand123 Bio Bananen Ecuador./kolumb. je kg"],
+    ["Hähnchenbrust", "Metzgerfrisch Hähnchenbrustfilets HINWEIS: MIT LIDL PLUS APP Teilstücke. Je 1,5 kg"],
+    ["Hähnchenbrust", "Gut & Günstig Hähnchenbrust-Innenfilets 400 g"],
+    ["Hähnchenbrust", "MC Ennedy Hähnchenbrustfiletstücke Versch. Sorten. Gekühlt. Je 150 g"],
+    ["Hähnchenbrust", "Meine Metzgerei Hähnchenbrustfilet XXL Teilstücke 1,5-kg-Packung"],
+    ["Hähnchenbrust", "Hofmaier Hähnchenbrustfilet oder Putenbrustfilet versch. Sorten 100 g"],
+    ["Reis", "Bon-Ri Basmati Reis 1-kg-Packung"],
+    ["Reis", "Ben's Original Express Reis Versch. Sorten, je 220 g"],
+  ];
+  const no = [
+    ["Milch", "Müller Müllermilch Shake Versch. Sorten; je 400-ml-Flasche; zzgl. Pfand 0.25"],
+    ["Milch", "Müller Müllermilch versch. Sorten, 400 ml, zzgl. 0,25 Pfand"],
+    ["Milch", "MC Ennedy Milchshake 230ml"],
+    ["Milch", "Müller Müllermilch High Protein High Protein oder Matcha Milchmischgetränk, 1,5 % Fett im Milchanteil, versch. Sorten, gekühlt"],
+    ["Milch", "Hafermilch"],
+    ["Milch", "Buttermilch"],
+    ["Hackfleisch", "Metzgerfrisch Schweine-Rinder-Cevapcici XXL gewürzt. je 800 g"],
+    ["Hackfleisch", "BBQ Cevapcici Vom Rind; gewürzt; 400-g-Packung"],
+    ["Hackfleisch", "ja! Hamburger Patties aus Rindfleisch, gewürzt, je 400-g-Pckg."],
+    ["Hackfleisch", "Hacksteak"],
+    ["Bananen", "Bruno Banani Man Duschgel je 250-ml-Fl."],
+    ["Hähnchenbrust", "Minutenschnitzel"],
+    ["Hähnchenbrust", "Hähnchen-Minutenschnitzel"],
+    ["Reis", "Müller Milch Reis HINWEIS: MIT PENNY APP Versch. Sorten, je 200 g"],
+    ["Reis", "Müller Milchreis XXL 250g"],
+    ["Reis", "Dr. Oetker High Protein Milchreis HINWEIS: MIT LIDL PLUS APP oder Pudding Versch. Sorten. Gekühlt. Je 400 g"],
+    ["Reis", "Bäckerkrönung Reis Waffeln Versch. Sorten, je 150 g"],
+    ["Reis", "Frosta High Protein Hähnchen mit Reis & Brokkoli oder Asia Style mit Bandnudeln tiefgefroren, 500 g"],
+    ["Reis", "Edeka Bio Bio Leinsamen geschrotet oder ganz naturbelassen, 500 g"],
+    ["Reis", "Reiswaffeln"],
+    ["Reis", "Milchreis"],
+  ];
+  for (const [item, name] of yes) assert.equal(offerMatches(item, name), true, name);
+  for (const [item, name] of no) assert.equal(offerMatches(item, name), false, name);
+});
+
 test("Grundpreis entscheidet, nicht der Packungspreis", () => {
   const ranked = rankOffers([
     { n: "A", pr: "2.00", up: "8" },

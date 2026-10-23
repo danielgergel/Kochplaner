@@ -7,7 +7,7 @@ const root = path.resolve(import.meta.dirname, "..");
 
 test("service worker precaches files that exist and bumps the cache", () => {
   const sw = fs.readFileSync(path.join(root, "sw.js"), "utf8");
-  assert.match(sw, /kochplaner-v13/);
+  assert.match(sw, /kochplaner-v14/);
   const block = sw.match(/const CORE = \[([\s\S]*?)\];/);
   assert.ok(block);
   const files = [...block[1].matchAll(/"([^"]+)"/g)].map(m => m[1]).filter(f => f !== "./");
