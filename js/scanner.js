@@ -11,7 +11,7 @@ function loadBD(){
   scnLoaded = new Promise((res, rej) => {
     if (window.BarcodeDetectionAPI || window.BarcodeDetector) { res(); return; }
     const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/barcode-detector@3.1.2/dist/iife/ponyfill.min.js";
+    s.src = new URL("../vendor/barcode/ponyfill.min.js", import.meta.url).href;
     s.onload = res;
     s.onerror = () => { scnLoaded = null; rej(new Error("load")); };
     document.head.appendChild(s);
@@ -39,8 +39,16 @@ export async function openScan(){
   scn.hidden = false;
   scanShell(`<video id="scv" playsinline muted autoplay></video><p class="scs" id="scs">Kamera wird gestartet …</p>
    <div class="frm" style="margin-top:10px"><label class="full">Oder Nummer unter dem Barcode eintippen<input id="scm" inputmode="numeric" placeholder="4008400402222"></label><button class="btn full" data-scgo>Suchen</button></div>`);
+  let stream;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:"environment" }, width:{ ideal:1280 }, height:{ ideal:720 } }, audio:false });
+    stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:"environment" }, width:{ ideal:1280 }, height:{ ideal:720 } }, audio:false });
+  } catch (e) {
+    stopCam();
+    const s = $("#scs");
+    if (s) s.textContent = "Kamera nicht verfügbar. Tippe die Nummer unter dem Barcode ein.";
+    return;
+  }
+  try {
     if (tok !== scTok || scn.hidden) { stream.getTracks().forEach(t => t.stop()); return; }
     scnStream = stream;
     await loadBD();
@@ -65,7 +73,7 @@ export async function openScan(){
   } catch (e) {
     stopCam();
     const s = $("#scs");
-    if (s) s.textContent = "Kamera nicht verfügbar. Tippe die Nummer unter dem Barcode ein.";
+    if (s) s.textContent = "Der Scanner konnte nicht gestartet werden. Tippe die Nummer unter dem Barcode ein.";
   }
 }
 async function offFetch(ean){
@@ -73,6 +81,7 @@ async function offFetch(ean){
   let r;
   try { r = await fetch(url, { headers:{ "X-User-Agent":"Kochplaner/1.0 (github.com/danielgergel/Kochplaner)" } }); }
   catch (e) { r = await fetch(url); }
+  if (r.status === 404) return null;
   if (!r.ok) throw new Error("http");
   const j = await r.json();
   const pr = j && j.product;
@@ -101,16 +110,27 @@ async function lookup(ean){
   if (!p) {
     try { p = await offFetch(ean); }
     catch (e) {
-      scanShell(`<p class="scs">Keine Verbindung zu Open Food Facts. Versuche es später noch einmal.</p><div class="stack"><button class="btn" data-scr>Nochmal scannen</button></div>`);
+      const net = (typeof navigator !== "undefined" && navigator.onLine === false) || !e || e.message !== "http";
+      showManual(ean, net ? "net" : "http");
       return;
     }
     if (p) { OFFC[ean] = p; try { storage.setItem(OFFK, JSON.stringify(OFFC)); } catch (e) {} }
   }
-  if (!p) {
-    scanShell(`<p class="scs">Produkt ${ean} wurde nicht gefunden. Du kannst es unter „Eigener Eintrag“ selbst eintragen.</p><div class="stack"><button class="btn" data-scr>Nochmal scannen</button></div>`);
-    return;
-  }
+  if (!p) { showManual(ean, "missing"); return; }
   showProd(p);
+}
+function showManual(ean, why){
+  const msg = why === "missing"
+    ? `Produkt ${esc(ean)} wurde nicht gefunden. Trag Name, Kalorien und Eiweiß selbst ein.`
+    : why === "net"
+      ? "Keine Verbindung zu Open Food Facts. Das Nachschlagen braucht Internet. Trag Name, Kalorien und Eiweiß selbst ein."
+      : "Open Food Facts antwortet gerade nicht. Trag Name, Kalorien und Eiweiß selbst ein.";
+  scanShell(`<p class="scs">${msg}</p>
+   <div class="frm"><label class="full">Name<input id="smn" value="Produkt ${esc(ean)}"></label>
+   <label>kcal<input id="smk" inputmode="numeric" placeholder="450"></label>
+   <label>Eiweiß (g)<input id="smp" inputmode="decimal" placeholder="5"></label>
+   <button class="btn pri full" data-scman>Ins Tagebuch eintragen</button></div>
+   <div class="stack"><button class="btn" data-scr>Nochmal scannen</button></div>`);
 }
 function showProd(p){
   SCP = { p:Object.assign({}, p) };
@@ -166,6 +186,18 @@ export function bindScanner(){
     if (d.scr !== undefined) { openScan(); return; }
     if (d.scx !== undefined) { closeScan(); return; }
     if (d.scgo !== undefined) { lookup(($("#scm") || {}).value || ""); return; }
+    if (d.scman !== undefined) {
+      const n = (($("#smn") || {}).value || "").trim();
+      const num = id => parseFloat(((($(id) || {}).value) || "").replace(",", ".")) || 0;
+      const k = num("#smk"), p = num("#smp");
+      if (!n) { toast("Bitte einen Namen eintragen"); return; }
+      if (k <= 0 && p <= 0) { toast("Bitte Nährwerte eintragen"); return; }
+      addEntry({ n, k, p });
+      closeScan();
+      if (ui.pm === "Y" && !$("#pnl").hidden) drawDy(true);
+      toast("Eingetragen");
+      return;
+    }
     if (d.scadd !== undefined && SCP) {
       if (!(SCP.a > 0)) { toast("Bitte eine Menge eintragen"); return; }
       if (SCP.kk <= 0 && SCP.pp <= 0) { toast("Bitte Nährwerte eintragen"); return; }

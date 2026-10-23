@@ -3,13 +3,14 @@ import { $, toast } from "./util.js";
 import { textFromRecognition, parseRecipeText } from "./ocr-text.js";
 import { showOcrReview } from "./recipes.js";
 
+const tessBase = new URL("../vendor/tesseract/", import.meta.url);
 let tessP = null;
 function loadTess(){
   if (window.Tesseract) return Promise.resolve();
   if (tessP) return tessP;
   tessP = new Promise((res, rej) => {
     const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+    s.src = new URL("tesseract.min.js", tessBase).href;
     s.onload = () => res();
     s.onerror = () => { tessP = null; rej(new Error("load")); };
     document.head.appendChild(s);
@@ -83,7 +84,10 @@ export async function preprocessImage(file){
 async function ocrFiles(files, onProg){
   await loadTess();
   const worker = await window.Tesseract.createWorker("deu", 1, {
-    langPath: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/deu/4.0.0_best_int",
+    workerPath: new URL("worker.min.js", tessBase).href,
+    corePath: tessBase.href,
+    langPath: tessBase.href,
+    workerBlobURL: false,
     logger: m => { if (m && m.status === "recognizing text" && onProg) onProg(m.progress || 0); },
   });
   try { await worker.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" }); } catch (e) {}
@@ -122,7 +126,7 @@ export function bindOcr(){
       const parsed = parseRecipeText(text);
       showOcrReview(parsed, dropped.filter(l => !parsed.dropped.includes(l)));
     } catch (e) {
-      if (st()) st().textContent = "Texterkennung nicht möglich. Beim ersten Mal braucht sie Internet. Du kannst den Text auch unten einfügen.";
+      if (st()) st().textContent = "Texterkennung nicht möglich. Du kannst den Text auch unten einfügen.";
       toast("Texterkennung nicht möglich");
     }
     f.value = "";

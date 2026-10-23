@@ -27,14 +27,56 @@ export function setDiaryCodeVisible(v){ ui.dcShow = v; }
 
 const saveLast = () => { try { storage.setItem(SYK, JSON.stringify(last)); } catch (e) {} };
 const dSetSync = u => { dls = u; try { storage.setItem(DSK, String(u)); } catch (e) {} };
+const netDown = () => typeof navigator !== "undefined" && navigator.onLine === false;
+const failState = () => netDown() ? "offline" : "error";
+export function syncStatusText(){
+  if (typeof window === "undefined" || !window.FB) return "Keine Verbindung zum Server, die App arbeitet lokal weiter.";
+  if (ui.syncState === "online") return "Verbunden.";
+  if (ui.syncState === "offline") return "Gerade kein Internet. Alles bleibt auf diesem Handy und wird gesendet, sobald wieder Netz da ist.";
+  if (ui.syncState === "error") return "Verbindung gestört. Die Änderungen bleiben auf diesem Handy und werden später gesendet.";
+  return "Verbinde …";
+}
+export function diaryStatusText(){
+  if (ui.dState === "online") return "Verbunden, alles gesichert.";
+  if (ui.dState === "offline") return "Gerade kein Internet. Neue Einträge bleiben auf diesem Handy und werden gesichert, sobald wieder Netz da ist.";
+  if (ui.dState === "error") return "Verbindung gestört. Die Einträge bleiben auf diesem Handy und werden später gesichert.";
+  return "Wird gesichert, sobald eine Verbindung besteht.";
+}
+function paintStatus(){
+  const a = document.querySelector("#hh-st");
+  if (a) a.textContent = syncStatusText();
+  const b = document.querySelector("#dy-st");
+  if (b) b.textContent = diaryStatusText();
+}
 function chip(){
   const b = document.querySelector("#bhh");
-  if (!b) return;
-  b.classList.toggle("sync", ui.syncState === "online");
-  b.classList.toggle("err", ui.syncState === "error");
+  if (b) {
+    b.classList.toggle("sync", ui.syncState === "online");
+    b.classList.toggle("err", ui.syncState === "error");
+  }
+  paintStatus();
+}
+function linkState(fromCache){
+  if (netDown()) return "offline";
+  return fromCache ? "off" : "online";
+}
+let retryTimer = null;
+function scheduleRetry(){
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    if (netDown()) { scheduleRetry(); return; }
+    if (HH && HH.mode === "cloud" && HH.code) startSync();
+    if (DC && String(DC).length >= 16) dStart();
+  }, 3000);
+}
+function listenFailed(err){
+  const code = String(err && err.code || "");
+  if (code.indexOf("permission-denied") >= 0) return;
+  scheduleRetry();
 }
 export function stopSync(){
-  if (unsub) { unsub(); unsub = null; }
+  if (unsub) { try { unsub(); } catch (e) {} unsub = null; }
   fbRef = null; last = {}; ready = false; ui.syncState = "off"; chip();
 }
 export function applyRemote(d){
@@ -82,7 +124,7 @@ export function pushShared(force){
   saving = true;
   FB.setDoc(fbRef, o, { merge:true }).then(saveLast).catch(() => {
     sent.forEach(k => { last[k] = prev[k]; });
-    ui.syncState = "error";
+    ui.syncState = failState();
     chip();
   }).finally(() => { saving = false; if (dirty) { dirty = false; pushShared(false); } });
 }
@@ -92,9 +134,9 @@ export function startSync(){
   try { last = JSON.parse(storage.getItem(SYK) || "{}") || {}; } catch (e) { last = {}; }
   fbRef = FB.doc(FB.db, "households", HH.code);
   unsub = FB.onSnapshot(fbRef, snap => {
-    if (snap.metadata.hasPendingWrites) return;
-    ui.syncState = snap.metadata.fromCache ? "off" : "online";
+    ui.syncState = linkState(snap.metadata.fromCache);
     chip();
+    if (snap.metadata.hasPendingWrites) return;
     if (!snap.exists()) {
       if (!snap.metadata.fromCache) {
         if (joinMode) {
@@ -114,7 +156,7 @@ export function startSync(){
     joinMode = false;
     applyRemote(snap.data());
     if (!snap.metadata.fromCache) { ready = true; pushShared(false); }
-  }, () => { ui.syncState = "error"; chip(); });
+  }, err => { unsub = null; ui.syncState = failState(); chip(); listenFailed(err); });
 }
 
 function dMerge(r){
@@ -130,7 +172,7 @@ function dMerge(r){
   });
 }
 export function dStop(){
-  if (dUnsub) { dUnsub(); dUnsub = null; }
+  if (dUnsub) { try { dUnsub(); } catch (e) {} dUnsub = null; }
   dRef = null; dReady = false; ui.dState = "off";
 }
 export function dPush(force){
@@ -141,18 +183,20 @@ export function dPush(force){
   dSaving = true;
   FB.setDoc(dRef, { dyS:JSON.stringify(DY), u }).then(() => {
     dSetSync(u);
-    ui.dState = "online";
+    ui.dState = netDown() ? "offline" : "online";
     dPreferLocal = false;
-  }).catch(() => { ui.dState = "error"; }).finally(() => { dSaving = false; if (dDirty) { dDirty = false; dPush(false); } });
+    paintStatus();
+  }).catch(() => { ui.dState = failState(); paintStatus(); }).finally(() => { dSaving = false; if (dDirty) { dDirty = false; dPush(false); } });
 }
 export function dStart(){
   if (!FB || !DC || DC.length < 16) return;
   dStop();
   dRef = FB.doc(FB.db, "diaries", DC);
   dUnsub = FB.onSnapshot(dRef, snap => {
+    ui.dState = linkState(snap.metadata.fromCache);
+    paintStatus();
     if (snap.metadata.hasPendingWrites) return;
     if (snap.metadata.fromCache && !snap.exists()) return;
-    ui.dState = snap.metadata.fromCache ? "off" : "online";
     if (!snap.exists()) {
       if (dRestoreMode) {
         dRestoreMode = false;
@@ -187,7 +231,7 @@ export function dStart(){
       dPush(true);
     }
     dReady = true;
-  }, () => { ui.dState = "error"; });
+  }, err => { dUnsub = null; ui.dState = failState(); paintStatus(); listenFailed(err); });
 }
 
 export function newCode(){
@@ -265,10 +309,21 @@ export function wireHooks(){
   setDiaryHook(() => { clearTimeout(dTimer); dTimer = setTimeout(() => dPush(false), 1200); });
 }
 
+function openFirestore(initializeFirestore, app, persistentLocalCache, persistentMultipleTabManager){
+  const base = { experimentalAutoDetectLongPolling:true };
+  try {
+    return initializeFirestore(app, Object.assign({ localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }, base));
+  } catch (e) {}
+  try {
+    return initializeFirestore(app, Object.assign({ localCache: persistentLocalCache() }, base));
+  } catch (e) {}
+  return initializeFirestore(app, base);
+}
 export async function initFirebase(){
   try {
-    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-    const { initializeFirestore, doc, onSnapshot, setDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const { initializeApp } = await import("../vendor/firebase/firebase-app.js");
+    const { initializeFirestore, doc, onSnapshot, setDoc, persistentLocalCache, persistentMultipleTabManager, setLogLevel } = await import("../vendor/firebase/firebase-firestore.js");
+    setLogLevel("silent");
     const app = initializeApp({
       apiKey:"AIzaSyAJSl4t2Mj9uVev5jg2gcbzpQQermiZA4M",
       authDomain:"kochplaner-f70c8.firebaseapp.com",
@@ -277,7 +332,7 @@ export async function initFirebase(){
       messagingSenderId:"1049347489480",
       appId:"1:1049347489480:web:f0bcd79568d69ab1cbaffd",
     });
-    const db = initializeFirestore(app, { experimentalAutoDetectLongPolling:true });
+    const db = openFirestore(initializeFirestore, app, persistentLocalCache, persistentMultipleTabManager);
     FB = { db, doc, onSnapshot, setDoc };
     window.FB = FB;
     startSync();
@@ -285,4 +340,18 @@ export async function initFirebase(){
     chip();
     if (ui.pm === "H") ui.openHh();
   } catch (e) {}
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+    if (HH && HH.mode === "cloud" && HH.code) startSync();
+    if (DC && String(DC).length >= 16) dStart();
+  });
+  window.addEventListener("offline", () => {
+    if (fbRef) ui.syncState = "offline";
+    if (dRef) ui.dState = "offline";
+    chip();
+  });
 }
