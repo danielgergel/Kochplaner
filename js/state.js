@@ -18,8 +18,8 @@ export const OFFK = "kochplaner.off.v1";
 export const DCK = "kochplaner.dc";
 export const DSK = "kochplaner.dsync";
 
-export const SH = ["sel","sc","fr","cust","done","offers","week","rate","aoffers","plz","stores","wish","extra"];
-export const DFLT = k => k === "plz" ? "" : (k === "cust" || k === "offers" || k === "stores" || k === "wish" || k === "extra" ? [] : {});
+export const SH = ["sel","sc","fr","cust","done","offers","week","rate","aoffers","plz","stores","wish","extra","offerUrl"];
+export const DFLT = k => (k === "plz" || k === "offerUrl") ? "" : (k === "cust" || k === "offers" || k === "stores" || k === "wish" || k === "extra" ? [] : {});
 export const DEFWISH = ["Skyr","Wasser","Rinderhack mager","Tomaten","Erdbeeren","Salat","Gurke","Protein-Joghurt","Wraps","Monster Energy","Red Bull","Tortellini","Reibekäse light","Parmesan","Hähnchen-Minutenschnitzel","Hähnchenbrust","Steak mariniert","Putenschnitzel","Cola Zero","Magerquark","Hüttenkäse","Proteinriegel"];
 
 function readJSON(key){
@@ -40,6 +40,7 @@ if (!ST.aoffers || typeof ST.aoffers !== "object" || Array.isArray(ST.aoffers)) 
 if (!ST.week || typeof ST.week !== "object" || Array.isArray(ST.week)) ST.week = {};
 if (!ST.rate || typeof ST.rate !== "object" || Array.isArray(ST.rate)) ST.rate = {};
 if (typeof ST.plz !== "string") ST.plz = "";
+if (typeof ST.offerUrl !== "string") ST.offerUrl = "";
 if (!Array.isArray(ST.stores)) ST.stores = ["REWE","Lidl","Penny"];
 if (!Array.isArray(ST.wish)) ST.wish = DEFWISH.slice();
 if (!Array.isArray(ST.extra)) ST.extra = [];

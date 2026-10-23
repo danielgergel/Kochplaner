@@ -5,6 +5,7 @@ import { loadBuiltinRecipes } from "./data/recipes.js";
 import { rebuildAll, cleanIds, recipesHtml, listHtml, openRecipe, closeRecipe, redrawDetail, refreshFridge, openFridge, openDice, bindRecipeDom } from "./recipes.js";
 import { planHtml, bindPlan } from "./plan.js";
 import { shopHtml, badges, bindShopping } from "./shopping.js";
+import { maybeRefreshOffers } from "./offers.js";
 import { drawDy, bindDiary } from "./diary.js";
 import { closeScan, bindScanner, warmupScanner } from "./scanner.js";
 import { bindOcr } from "./ocr.js";
@@ -56,6 +57,7 @@ function bindCore(){
     ui.tab = b.dataset.tab;
     render();
     window.scrollTo(0, 0);
+    if (ui.tab === "E") maybeRefreshOffers();
   });
   $("#app").addEventListener("input", ev => {
     if (ev.target.id === "q") { ui.fq = ev.target.value; const list = $("#list"); if (list) list.innerHTML = listHtml(); }

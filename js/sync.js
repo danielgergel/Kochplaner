@@ -83,10 +83,11 @@ export function applyRemote(d){
   if (!d || typeof d !== "object") return;
   let ch = false, cust = false;
   SH.forEach(k => {
+    if (k === "aoffers") return;
     const s = d[k + "S"];
     if (typeof s !== "string" || s === last[k]) return;
     const loc = JSON.stringify(ST[k] == null ? DFLT(k) : ST[k]);
-    if (k !== "aoffers" && last[k] !== undefined && loc !== last[k]) return;
+    if (last[k] !== undefined && loc !== last[k]) return;
     let parsed;
     try { parsed = JSON.parse(s); } catch (e) { return; }
     const clean = sanitizeField(k, parsed);

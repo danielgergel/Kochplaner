@@ -78,6 +78,7 @@ export function applyBackup(data){
     if (!ST[k] || typeof ST[k] !== "object" || Array.isArray(ST[k])) ST[k] = {};
   });
   if (typeof ST.plz !== "string") ST.plz = "";
+  if (typeof ST.offerUrl !== "string") ST.offerUrl = "";
   rebuildAll();
   const diary = data.diary || sanitizeDiary(null);
   diary.u = Date.now();

@@ -6,7 +6,7 @@ import { exportBackup, parseBackup, applyBackup, summaryOf } from "./backup.js";
 import { rebuildAll } from "./recipes.js";
 import { readTheme, saveTheme } from "./theme.js";
 
-const APPV = "23.10.2026, Stand 19";
+const APPV = "23.10.2026, Stand 20";
 const ALLSTORES = ["REWE","Lidl","Penny","Aldi","Edeka","Kaufland","Netto"];
 let pending = null;
 
@@ -19,9 +19,11 @@ function themeHtml(){
 function setHtml(){
   const st = ST.stores || [];
   return `<h3 class="sec">Angebote und Einkauf</h3>
-  <p class="note" style="margin-top:0">Damit die Wochen-Aufgabe passende Angebote in deiner Nähe findet.</p>
+  <p class="note" style="margin-top:0">Postleitzahl und Läden gelten für die Angebotssuche in der Einkaufsliste.</p>
   <div class="frm"><label class="full">Postleitzahl<input id="st-plz" inputmode="numeric" maxlength="5" placeholder="z. B. 76133" value="${esc(ST.plz || "")}"></label>
-  <div class="full"><div style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:6px">Läden, bei denen ihr einkauft</div><div class="ing">${ALLSTORES.map(s => `<button data-stor="${s}" aria-pressed="${st.includes(s)}">${s}</button>`).join("")}</div></div></div>`;
+  <label class="full">Adresse der Angebotssuche<input id="st-offer" inputmode="url" autocomplete="off" placeholder="https://kochplaner-angebote.danielgergel.workers.dev" value="${esc(ST.offerUrl || "")}"></label>
+  <div class="full"><div style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:6px">Läden, bei denen ihr einkauft</div><div class="ing">${ALLSTORES.map(s => `<button data-stor="${s}" aria-pressed="${st.includes(s)}">${s}</button>`).join("")}</div></div></div>
+  <p class="note">Leer lassen, dann gilt die voreingestellte Adresse. Der Dienst fragt marktguru ab. Das ist nicht offiziell und kann ausfallen.</p>`;
 }
 function dcHtml(){
   const DC = diaryCode();
@@ -61,7 +63,7 @@ export function hhHtml(){
   <div class="dbody"><h2>Einstellungen</h2>${themeHtml()}<h3 class="sec">Haushalt und Teilen</h3>${household}
   ${setHtml()}
   ${dcHtml()}
-  <h3 class="sec">Datenquellen</h3><p class="note" style="margin-top:0">Gescannte Produkte: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL). Die Werte beim Schnell-Eintragen sind Durchschnittswerte und können abweichen.</p>
+  <h3 class="sec">Datenquellen</h3><p class="note" style="margin-top:0">Gescannte Produkte: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL). Die Werte beim Schnell-Eintragen sind Durchschnittswerte und können abweichen. Angebote kommen über den eigenen Dienst von marktguru, inoffiziell, und können ausfallen.</p>
   ${backupHtml()}
   <h3 class="sec">App</h3><p class="note" style="margin-top:0">Version ${APPV}</p><div class="stack"><button class="btn" data-reload>Neu laden</button></div>
   </div>`;
@@ -77,6 +79,10 @@ export function bindSettings(){
       const v = ev.target.value.replace(/\D/g, "").slice(0, 5);
       if (v !== ev.target.value) ev.target.value = v;
       ST.plz = v;
+      persist();
+    }
+    if (ev.target.id === "st-offer") {
+      ST.offerUrl = ev.target.value.trim().slice(0, 200);
       persist();
     }
     if (ev.target.id === "st-wish") {
