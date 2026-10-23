@@ -160,12 +160,43 @@ export function sanitizeStringList(v, max, itemMax){
   return out;
 }
 
+function sanitizeHit(o){
+  if (!isObj(o)) return null;
+  const s = str(o.s, 40);
+  const n = str(o.n, 160);
+  if (!s || !n) return null;
+  const out = { s, n, pr: o.pr == null ? "" : String(o.pr).trim().slice(0, 24), unit: str(o.unit, 40), up: "", upu: str(o.upu, 12), u: "", url: "" };
+  const up = asNumber(o.up);
+  if (up != null && up >= 0 && up < 100000) out.up = String(Math.round(up * 1000) / 1000);
+  if (typeof o.u === "string" && DATE_RE.test(o.u)) out.u = o.u;
+  if (typeof o.url === "string" && /^https:\/\/\S+$/.test(o.url)) out.url = o.url.slice(0, 300);
+  return out;
+}
+
 export function sanitizeAoffers(v){
   if (!isObj(v)) return undefined;
-  const o = {};
+  const o = { items: [], byItem: {}, failed: [] };
   if (typeof v.at === "string" && DATE_RE.test(v.at)) o.at = v.at;
+  if (typeof v.ts === "number" && Number.isFinite(v.ts) && v.ts > 0 && v.ts < 1e15) o.ts = Math.round(v.ts);
   o.items = Array.isArray(v.items) ? v.items.map(sanitizeOffer).filter(Boolean).slice(0, 400) : [];
+  if (isObj(v.byItem)) {
+    for (const [k, arr] of Object.entries(v.byItem)) {
+      const key = str(k, 80);
+      if (!key || !Array.isArray(arr)) continue;
+      o.byItem[key] = arr.map(sanitizeHit).filter(Boolean).slice(0, 5);
+      if (Object.keys(o.byItem).length >= 40) break;
+    }
+  }
+  if (Array.isArray(v.failed)) o.failed = v.failed.map(x => str(x, 80)).filter(Boolean).slice(0, 40);
   return o;
+}
+
+export function sanitizeOfferUrl(v){
+  if (typeof v !== "string") return undefined;
+  const s = v.trim().slice(0, 200);
+  if (!s) return "";
+  if (!/^https:\/\/[a-z0-9.-]+\.[a-z]{2,}(?:\/[\w./~-]*)?$/i.test(s)) return "";
+  return s.replace(/\/$/, "");
 }
 
 export function sanitizePlz(v){
@@ -198,6 +229,7 @@ export function sanitizeField(k, v){
     case "week": return sanitizeWeek(v);
     case "rate": return sanitizeRate(v);
     case "aoffers": return sanitizeAoffers(v);
+    case "offerUrl": return sanitizeOfferUrl(v);
     case "plz": return sanitizePlz(v);
     case "stores": return sanitizeStringList(v, 20, 40);
     case "wish": return sanitizeStringList(v, 80, 60);
@@ -282,8 +314,8 @@ export function sanitizeRc(v){
 export function sanitizeState(raw){
   const src = isObj(raw) ? raw : {};
   const out = { v:1, u: asNumber(src.u) || 0, sel:{}, sc:{}, rc: sanitizeRc(src.rc) };
-  for (const k of ["sel","sc","fr","cust","done","offers","week","rate","aoffers","plz","stores","wish","extra"]) {
-    const empty = k === "plz" ? "" : (k === "cust" || k === "offers" || k === "stores" || k === "wish" || k === "extra" ? [] : {});
+  for (const k of ["sel","sc","fr","cust","done","offers","week","rate","aoffers","plz","stores","wish","extra","offerUrl"]) {
+    const empty = (k === "plz" || k === "offerUrl") ? "" : (k === "cust" || k === "offers" || k === "stores" || k === "wish" || k === "extra" ? [] : {});
     const c = src[k] === undefined ? empty : sanitizeField(k, src[k]);
     out[k] = c === undefined ? empty : c;
   }

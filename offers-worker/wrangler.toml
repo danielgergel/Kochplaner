@@ -1,0 +1,8 @@
+name = "kochplaner-angebote"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+# Optional, kein Pflicht-Geheimnis:
+# MARKTGURU_API_KEY     Geheimnis, x-apikey von marktguru
+# MARKTGURU_CLIENT_KEY  Geheimnis, x-clientkey, falls marktguru ihn verlangt
