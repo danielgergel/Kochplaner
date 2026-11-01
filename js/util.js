@@ -1,13 +1,29 @@
 export const $ = s => document.querySelector(s);
 export const esc = s => String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
-export function toast(m){
+export function toast(m, opt){
   const t = $("#toast");
   if (!t) return;
-  t.textContent = m;
+  t.replaceChildren();
+  const span = document.createElement("span");
+  span.textContent = m;
+  t.append(span);
+  const act = !!(opt && opt.label && opt.run);
+  t.classList.toggle("act", act);
+  if (act) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = opt.label;
+    b.addEventListener("click", ev => {
+      ev.stopPropagation();
+      t.classList.remove("on");
+      opt.run();
+    });
+    t.append(b);
+  }
   t.classList.add("on");
   clearTimeout(toast.h);
-  toast.h = setTimeout(() => t.classList.remove("on"), 1800);
+  toast.h = setTimeout(() => t.classList.remove("on"), act ? 6000 : 1800);
 }
 
 export const dkey = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");

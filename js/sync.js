@@ -95,7 +95,7 @@ export function applyRemote(d){
     last[k] = s;
     ST[k] = clean;
     ch = true;
-    if (k === "cust") cust = true;
+    if (k === "cust" || k === "ov") cust = true;
   });
   saveLast();
   if (!ch) return;

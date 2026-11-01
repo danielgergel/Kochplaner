@@ -7,6 +7,8 @@ import { NSVIDEO } from "./data/wake.js";
 import { showPanel, closePanel, setDiceTimer, clearDiceTimer } from "./panels.js";
 import { parseRecipeText } from "./ocr-text.js";
 import { badgeOf, haystack, idNumber } from "./recipe-badge.js";
+import { dietOf, dietMark, dietPasses } from "./diet.js";
+import { substituteFor, substituteById } from "./data/subs.js";
 
 const ORD = "FMAISPEX";
 export const GROUPS = ["Alle","★ Favoriten","Frühstück","Hauptmahlzeit","Snack & Beilage","Dessert"];
@@ -26,9 +28,25 @@ export function metaOf(r){
   return `${r.k} kcal · ${r.p} g Eiweiß · ${r.t}${(ST.rate && ST.rate[r.id]) ? " · " + "★".repeat(ST.rate[r.id]) : ""}`;
 }
 
+export function mergeRecipe(base, ov){
+  const r = Object.assign({}, base, ov, { id: base.id });
+  delete r.cust;
+  r.over = 1;
+  return r;
+}
+
 export function rebuildAll(){
-  for (const k in catalog.all) if (k[0] === "X") delete catalog.all[k];
-  (ST.cust || []).forEach(r => { catalog.all[r.id] = r; });
+  if (!catalog.base) {
+    const seed = {};
+    for (const [id, r] of Object.entries(catalog.all || {})) if (id && id[0] !== "X") seed[id] = r;
+    catalog.base = seed;
+  }
+  for (const k of Object.keys(catalog.all)) delete catalog.all[k];
+  for (const [id, base] of Object.entries(catalog.base)) {
+    const ov = ST.ov && ST.ov[id];
+    catalog.all[id] = ov ? mergeRecipe(base, ov) : base;
+  }
+  (ST.cust || []).forEach(r => { if (r && r.id) catalog.all[r.id] = r; });
   catalog.ALL = Object.values(catalog.all).sort((a, b) => a.id[0] === b.id[0]
     ? idNumber(a.id) - idNumber(b.id)
     : ORD.indexOf(a.id[0]) - ORD.indexOf(b.id[0]));
@@ -85,25 +103,30 @@ export function letSleep(){
   ui.awake = false;
 }
 
+function shownDiet(r){ return dietOf(r, ST.diet || {}); }
+export function nameHtml(r){ return esc(r.n) + dietMark(shownDiet(r)); }
+function dietOk(r){ return dietPasses(shownDiet(r), ui.fd || "Alle"); }
+
 function row(r){
   const n = ST.sel[r.id] || 0;
-  return `<div class="rc"><button class="rb" data-open="${r.id}"><span class="top"><span class="id">${esc(badgeOf(r.id, ST.cust))}</span><b>${esc(r.n)}</b></span><span class="meta">${metaOf(r)}</span></button><button class="add" data-add="${r.id}" aria-pressed="${n > 0}" aria-label="${n > 0 ? "Aus Plan nehmen" : "Zum Plan hinzufügen"}">${n > 0 ? (n > 1 ? n + "×" : "✓") : "+"}</button></div>`;
+  return `<div class="rc"><button class="rb" data-open="${r.id}"><span class="top"><span class="id">${esc(badgeOf(r.id, ST.cust))}</span><b>${nameHtml(r)}</b></span><span class="meta">${metaOf(r)}</span></button><button class="add" data-add="${r.id}" aria-pressed="${n > 0}" aria-label="${n > 0 ? "Aus Plan nehmen" : "Zum Plan hinzufügen"}">${n > 0 ? (n > 1 ? n + "×" : "✓") : "+"}</button></div>`;
 }
 export function listHtml(){
   const q = ui.fq.trim().toLowerCase();
   let rows;
   if (ui.fg === FAVG) {
-    rows = catalog.ALL.filter(r => starsOf(r.id) > 0 && (!q || haystack(r, ST.cust).includes(q)))
+    rows = catalog.ALL.filter(r => starsOf(r.id) > 0 && dietOk(r) && (!q || haystack(r, ST.cust).includes(q)))
       .sort((a, b) => starsOf(b.id) - starsOf(a.id) || a.n.localeCompare(b.n, "de"));
     if (!rows.length) return '<p class="empty">Noch keine Favoriten. Öffne ein Rezept und gib ihm 1 bis 3 Sterne.</p>';
   } else {
-    rows = catalog.ALL.filter(r => (ui.fg === "Alle" || grp(r) === ui.fg) && (!q || haystack(r, ST.cust).includes(q)));
-    if (!rows.length) return '<p class="empty">Kein Rezept gefunden.</p>';
+    rows = catalog.ALL.filter(r => (ui.fg === "Alle" || grp(r) === ui.fg) && dietOk(r) && (!q || haystack(r, ST.cust).includes(q)));
+    if (!rows.length) return '<p class="empty">Kein Rezept in dieser Auswahl.</p>';
   }
   return rows.map(row).join("");
 }
 export function recipesHtml(){
-  return `<div class="tools"><input id="q" type="search" placeholder="Rezept suchen" value="${esc(ui.fq)}" aria-label="Rezept suchen"><div class="chips" id="chips">${GROUPS.map(g => `<button data-g="${g}" aria-pressed="${g === ui.fg}">${g}</button>`).join("")}</div></div><button class="btn" id="newrec" style="width:100%;margin-bottom:10px">Eigenes Rezept anlegen</button><div id="list">${listHtml()}</div>`;
+  const diets = ["Alle","Vegetarisch","Vegan"];
+  return `<div class="tools"><input id="q" type="search" placeholder="Rezept suchen" value="${esc(ui.fq)}" aria-label="Rezept suchen"><div class="chips" id="chips">${GROUPS.map(g => `<button data-g="${g}" aria-pressed="${g === ui.fg}">${g}</button>`).join("")}</div><div class="chips" id="dietchips">${diets.map(g => `<button data-fd="${g}" aria-pressed="${g === (ui.fd || "Alle")}">${g}</button>`).join("")}</div></div><button class="btn" id="newrec" style="width:100%;margin-bottom:10px">Eigenes Rezept anlegen</button><div id="list">${listHtml()}</div>`;
 }
 
 export function detailHtml(id){
@@ -114,20 +137,37 @@ export function detailHtml(id){
   const s = starsOf(id);
   const stars = `<div class="stars" role="group" aria-label="Bewertung">${[1, 2, 3].map(k => `<button data-star="${k}" aria-pressed="${s >= k}" aria-label="${k} Stern${k > 1 ? "e" : ""}">${s >= k ? "★" : "☆"}</button>`).join("")}<span>${s ? s + " von 3 Sternen" : "Bewerten"}</span></div>`;
   let extra = `<div class="drow"><button class="btn" data-dyadd="${id}">Heute gegessen</button></div>`;
-  if (r.cust) extra += `<div class="drow"><button class="btn" data-cred="${id}">Bearbeiten</button><button class="btn warn" data-crdel="${id}">Löschen</button></div>`;
+  extra += `<div class="drow"><button class="btn" data-cred="${id}">Bearbeiten</button>`;
+  if (r.cust) extra += `<button class="btn warn" data-crdel="${id}">Löschen</button>`;
+  else if (ST.ov && ST.ov[id]) extra += `<button class="btn" data-crorig="${id}">Original wiederherstellen</button>`;
+  extra += `</div>`;
   return `<div class="dtop"><div class="in"><button class="back" id="back">Zurück</button><span class="wk" id="wk">Bildschirm wird geprüft</span></div></div>
-  <div class="dbody"><h2>${esc(r.n)}</h2>
+  <div class="dbody"><h2>${nameHtml(r)}</h2>
    <div class="tags"><span class="tag">${esc(badgeOf(r.id, ST.cust))}</span><span class="tag">${r.k} kcal${r.u && /pro /.test(r.u) ? "" : " pro Person"}</span><span class="tag">${r.p} g Eiweiß${r.u && /pro /.test(r.u) ? "" : " pro Person"}</span><span class="tag">${esc(r.t)}</span></div>
    ${r.u ? `<div class="meta" style="margin-bottom:4px">${esc(r.u)}</div>` : ""}
    ${stars}
    <h3 class="sec">Zutaten (${r.ns ? esc(r.pt) : "für 2 Personen"})</h3>
-   <div class="box">${r.z.map((x, i) => `<button class="ck" role="checkbox" aria-checked="${!!rc.z[i]}" data-rz="${i}" style="grid-template-columns:30px 1fr"><i>${ck}</i><span class="l">${esc(sc(x, f))}</span></button>`).join("")}</div>
+   <div class="box">${r.z.map((x, i) => ingRow(sc(x, f), i, !!rc.z[i])).join("")}</div>
    <h3 class="sec">Zubereitung</h3>
    <div class="box">${r.s.map((x, i) => `<button class="stp" role="checkbox" aria-checked="${!!rc.s[i]}" data-rs="${i}"><span class="n">${i + 1}</span><span class="t">${esc(x)}</span></button>`).join("")}</div>
    ${r.note ? `<div class="dn">${esc(r.note)}</div>` : ""}${r.q ? `<p class="note">Quelle: ${esc(r.q)}</p>` : ""}
    <div class="drow"><button class="btn${n ? "" : " pri"}" id="dadd">${n ? "Aus dem Plan nehmen" : "Zum Plan hinzufügen"}</button><button class="btn" id="drst">Haken zurücksetzen</button></div>
    ${extra}</div>`;
 }
+function ingRow(text, i, on){
+  const sub = substituteFor(text);
+  const mark = on ? "true" : "false";
+  if (!sub) return `<button class="ck" role="checkbox" aria-checked="${mark}" data-rz="${i}" style="grid-template-columns:30px 1fr"><i>${ck}</i><span class="l">${esc(text)}</span></button>`;
+  return `<div class="ckpair"><button class="ck" role="checkbox" aria-checked="${mark}" data-rz="${i}" aria-label="Abhaken"><i>${ck}</i></button><button type="button" class="subhit" data-sub="${esc(sub.id)}">${esc(text)}</button></div>`;
+}
+function openSub(id){
+  const e = substituteById(id);
+  const pop = $("#subpop");
+  if (!e || !pop) return;
+  pop.hidden = false;
+  pop.innerHTML = `<b>Statt ${esc(e.name)}</b><ul>${e.alts.map(a => `<li>${esc(a)}</li>`).join("")}</ul><button type="button" class="btn subx" data-subx>Schließen</button>`;
+}
+
 export function openRecipe(id){
   if (!catalog.all[id]) return;
   ui.openId = id;
@@ -173,7 +213,7 @@ function resHtml(){
   if (!rows.length) return '<p class="empty">Dazu passt noch nichts. Wähle mehr Zutaten aus.</p>';
   return rows.map(x => {
     const n = ST.sel[x.r.id] || 0;
-    return `<div class="rc"><button class="rb" data-fo="${x.r.id}"><span class="top"><span class="id">${esc(badgeOf(x.r.id, ST.cust))}</span><b>${esc(x.r.n)}</b></span><span class="meta">${metaOf(x.r)}</span>${x.m.length ? `<span class="fmiss">fehlt: ${esc(x.m.join(", "))}</span>` : '<span class="fok">Alles da</span>'}</button><button class="add" data-fa="${x.r.id}" aria-pressed="${n > 0}" aria-label="${n > 0 ? "Aus Plan nehmen" : "Zum Plan hinzufügen"}">${n > 0 ? "✓" : "+"}</button></div>`;
+    return `<div class="rc"><button class="rb" data-fo="${x.r.id}"><span class="top"><span class="id">${esc(badgeOf(x.r.id, ST.cust))}</span><b>${nameHtml(x.r)}</b></span><span class="meta">${metaOf(x.r)}</span>${x.m.length ? `<span class="fmiss">fehlt: ${esc(x.m.join(", "))}</span>` : '<span class="fok">Alles da</span>'}</button><button class="add" data-fa="${x.r.id}" aria-pressed="${n > 0}" aria-label="${n > 0 ? "Aus Plan nehmen" : "Zum Plan hinzufügen"}">${n > 0 ? "✓" : "+"}</button></div>`;
   }).join("");
 }
 function fridgeHtml(){
@@ -223,7 +263,7 @@ function dpool(){
 }
 function dshow(r, fin){
   const n = ST.sel[r.id] || 0;
-  $("#dres").innerHTML = `<div class="dice-card"><span class="id">${esc(badgeOf(r.id, ST.cust))}</span><b>${esc(r.n)}</b><span class="meta">${metaOf(r)}</span></div>` +
+  $("#dres").innerHTML = `<div class="dice-card"><span class="id">${esc(badgeOf(r.id, ST.cust))}</span><b>${nameHtml(r)}</b><span class="meta">${metaOf(r)}</span></div>` +
     (fin ? `<div class="dice-acts"><button class="btn pri" data-do="${r.id}">Rezept ansehen</button><button class="btn" data-da="${r.id}">${n ? "Im Plan ✓" : "Zum Plan"}</button></div>` : "");
 }
 function roll(){
@@ -248,6 +288,10 @@ export function openDice(){
 export function crHtml(id){
   const r = id ? catalog.all[id] : null;
   const g = r ? grp(r) : "Hauptmahlzeit";
+  const manual = id && ST.diet && ST.diet[id] || "";
+  const baseNote = id && catalog.base && catalog.base[id]
+    ? `<p class="note" style="margin-top:0">Deine Fassung ersetzt das Original in Plan und Einkauf. Die Nummer bleibt gleich. Mit „Original wiederherstellen“ kommt die eingebaute Fassung zurück.</p>`
+    : `<p class="note" style="margin-top:0">Zutaten und Mengen gelten für 2 Personen, genau so wie du sie eintippst. Kalorien und Eiweiß pro Person.</p>`;
   const box = `<div class="box" style="padding:12px;margin:0 0 12px"><b>Aus Screenshot oder Text</b>
    <label class="btn pri" style="display:flex;align-items:center;justify-content:center;margin-top:8px;cursor:pointer">Screenshot auswählen<input id="cr-img" type="file" accept="image/*" multiple style="position:absolute;opacity:0;width:1px;height:1px"></label>
    <p class="note" id="crimpst" style="margin:8px 0 0">Die Texterkennung läuft auf deinem Handy. Beim ersten Mal wird sie einmalig geladen, dafür braucht es Internet.</p>
@@ -257,11 +301,12 @@ export function crHtml(id){
     <button class="btn" data-crraw style="width:100%;margin-top:6px">Text übernehmen</button></details></div>`;
   return `<div class="dtop"><div class="in"><button class="back" data-pc>Abbrechen</button></div></div>
   <div class="dbody"><h2>${r ? "Rezept bearbeiten" : "Eigenes Rezept"}</h2>
-  <p class="note" style="margin-top:0">Zutaten und Mengen gelten für 2 Personen, genau so wie du sie eintippst. Kalorien und Eiweiß pro Person.</p>
+  ${baseNote}
   ${box}
   <div class="frm">
    <label class="full">Name<input id="cr-n" value="${esc(r ? r.n : "")}" placeholder="z. B. Hähnchen-Reis-Pfanne"></label>
    <label class="full">Art<select id="cr-g">${Object.keys(CGRP).map(x => `<option${x === g ? " selected" : ""}>${x}</option>`).join("")}</select></label>
+   <label class="full">Ernährung<select id="cr-d"><option value=""${!manual ? " selected" : ""}>Automatisch erkennen</option><option value="vegan"${manual === "vegan" ? " selected" : ""}>Vegan</option><option value="vegetarisch"${manual === "vegetarisch" ? " selected" : ""}>Vegetarisch</option><option value="fleisch"${manual === "fleisch" ? " selected" : ""}>Mit Fleisch oder Fisch</option></select></label>
    <label>kcal pro Person<input id="cr-k" inputmode="numeric" value="${r ? r.k : ""}" placeholder="automatisch"></label>
    <label>Eiweiß (g)<input id="cr-p" inputmode="numeric" value="${r ? r.p : ""}" placeholder="automatisch"></label>
    <label class="full">Zeit<input id="cr-t" value="${esc(r ? r.t : "")}" placeholder="automatisch"></label>
@@ -295,21 +340,45 @@ export function saveCr(id){
   const z = crLines("#cr-z"), s = crLines("#cr-s");
   if (!z.length) { toast("Bitte Zutaten eintragen"); return; }
   const num = v => Math.max(0, Math.round(parseFloat(String(v).replace(",", ".")) || 0));
+  const base = id && catalog.base ? catalog.base[id] : null;
+  const chosen = $("#cr-g").value;
   const rec = {
     id: id || ("X" + Date.now()), n,
-    c: CGRP[$("#cr-g").value] || "Hauptmahlzeit (16 Uhr)",
+    c: base && grp(base) === chosen ? (base.c || CGRP[chosen] || "Hauptmahlzeit (16 Uhr)") : (CGRP[chosen] || "Hauptmahlzeit (16 Uhr)"),
     k: num($("#cr-k").value), p: num($("#cr-p").value),
     t: $("#cr-t").value.trim() || "–",
     z, s: s.length ? s : ["Nach Belieben zubereiten."],
-    ns: true, pt: "für 2 Personen", cust: 1,
   };
-  const i = ST.cust.findIndex(c => c.id === rec.id);
-  if (i >= 0) ST.cust[i] = rec; else ST.cust.push(rec);
+  if (base) {
+    rec.ns = !!base.ns;
+    if (base.pt) rec.pt = base.pt;
+    if (base.w) rec.w = base.w;
+    ["note","q","u","mp"].forEach(k => { if (base[k]) rec[k] = base[k]; });
+    if (!ST.ov || typeof ST.ov !== "object" || Array.isArray(ST.ov)) ST.ov = {};
+    if (sameAsBase(base, rec)) delete ST.ov[id];
+    else ST.ov[id] = rec;
+  } else {
+    rec.ns = true;
+    rec.pt = "für 2 Personen";
+    rec.cust = 1;
+    const i = ST.cust.findIndex(c => c.id === rec.id);
+    if (i >= 0) ST.cust[i] = rec; else ST.cust.push(rec);
+  }
+  if (!ST.diet || typeof ST.diet !== "object" || Array.isArray(ST.diet)) ST.diet = {};
+  const diet = ($("#cr-d") && $("#cr-d").value) || "";
+  if (diet === "vegan" || diet === "vegetarisch" || diet === "fleisch") ST.diet[rec.id] = diet;
+  else delete ST.diet[rec.id];
   rebuildAll();
   persist();
   closePanel();
   if (ui.openId) redrawDetail();
   toast("Rezept gespeichert");
+}
+function sameAsBase(base, rec){
+  const sameList = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
+  return base.n === rec.n && Number(base.k) === Number(rec.k) && Number(base.p) === Number(rec.p)
+    && (base.t || "–") === rec.t && (base.c || "") === (rec.c || "")
+    && sameList(base.z, rec.z) && sameList(base.s, rec.s);
 }
 function setField(id, v){
   const e = $(id);
@@ -425,6 +494,7 @@ export function bindRecipeDom(){
     if (!t || !ui.openId) return;
     const d = t.dataset;
     if (t.id === "back") { closeRecipe(); return; }
+    if (d.sub) { openSub(d.sub); return; }
     const rc = ST.rc[ui.openId] || (ST.rc[ui.openId] = { z:{}, s:{} });
     if (d.rz !== undefined) { if (rc.z[d.rz]) delete rc.z[d.rz]; else rc.z[d.rz] = 1; persist(); redrawDetail(); return; }
     if (d.rs !== undefined) { if (rc.s[d.rs]) delete rc.s[d.rs]; else rc.s[d.rs] = 1; persist(); redrawDetail(); return; }
@@ -443,11 +513,21 @@ export function bindRecipeDom(){
     if (t.id === "newrec") { openCr(""); return; }
     if (d.crsave !== undefined) { saveCr(d.crsave); return; }
     if (d.cred) { openCr(d.cred); return; }
+    if (d.crorig) {
+      if (ST.ov) delete ST.ov[d.crorig];
+      rebuildAll();
+      persist();
+      redrawDetail();
+      toast("Original wiederhergestellt");
+      return;
+    }
+    if (d.subx !== undefined) { const pop = $("#subpop"); if (pop) pop.hidden = true; return; }
     if (d.crdel) {
       if (t.dataset.c) {
         ST.cust = ST.cust.filter(c => c.id !== d.crdel);
         delete ST.sel[d.crdel];
         delete ST.rc[d.crdel];
+        if (ST.diet) delete ST.diet[d.crdel];
         rebuildAll();
         persist();
         closeRecipe();
@@ -484,6 +564,13 @@ export function bindRecipeDom(){
       persist();
       redrawDetail();
     }
+  });
+  document.addEventListener("click", ev => {
+    const pop = $("#subpop");
+    if (!pop || pop.hidden) return;
+    const el = ev.target && ev.target.closest ? ev.target : (ev.target && ev.target.parentElement);
+    if (el && (el.closest("#subpop") || el.closest("[data-sub]"))) return;
+    pop.hidden = true;
   });
   document.addEventListener("visibilitychange", () => {
     if (ui.openId && document.visibilityState === "visible") keepAwake();

@@ -31,11 +31,13 @@ export function summaryOf(data){
   const days = Object.keys((data.diary && data.diary.days) || {}).length;
   const recipes = (st.cust || []).length;
   const plan = Object.keys(st.sel || {}).length;
+  const changed = Object.keys(st.ov || {}).length;
   const bits = [
     ntext(recipes, "eigenes Rezept", "eigene Rezepte"),
     ntext(plan, "Gericht im Plan", "Gerichte im Plan"),
     ntext(days, "Tagebuch-Tag", "Tagebuch-Tage"),
   ];
+  if (changed) bits.push(ntext(changed, "geändertes Rezept", "geänderte Rezepte"));
   if (data.household && data.household.mode === "cloud") bits.push("ein Haushalt-Code");
   if (data.diaryCode) bits.push("ein Tagebuch-Code");
   return bits.join(", ");
@@ -74,7 +76,7 @@ function protectHouseholdPush(){
 export function applyBackup(data){
   replaceState(data.state);
   ["cust","offers","stores","wish","extra"].forEach(k => { if (!Array.isArray(ST[k])) ST[k] = []; });
-  ["done","fr","sc","sel","rc","week","rate","aoffers"].forEach(k => {
+  ["done","fr","sc","sel","rc","week","rate","aoffers","ov","diet","sx"].forEach(k => {
     if (!ST[k] || typeof ST[k] !== "object" || Array.isArray(ST[k])) ST[k] = {};
   });
   if (typeof ST.plz !== "string") ST.plz = "";
