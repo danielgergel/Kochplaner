@@ -1,6 +1,6 @@
 import { catalog, ST, ui, persist } from "./state.js";
 import { $, esc, toast, WD } from "./util.js";
-import { metaOf, grp, CGRP } from "./recipes.js";
+import { metaOf, grp, CGRP, nameHtml } from "./recipes.js";
 import { badgeOf, haystack } from "./recipe-badge.js";
 import { showPanel, closePanel } from "./panels.js";
 
@@ -19,7 +19,7 @@ export function planHtml(){
     body = `<div class="sum"><b>${n}× kochen</b> aus ${ids.length} Rezept${ids.length > 1 ? "en" : ""}${nd ? `, davon <b>${nd} gegessen</b>` : ""}. Mengen gelten für 2 Personen. Weiter zum <b>Einkauf</b> für die Liste.</div>` +
       ids.map(id => {
         const r = catalog.all[id], g = !!dn[id];
-        return `<div class="prow${g ? " gk" : ""}"><div class="nm"><span class="id">${esc(badgeOf(r.id, ST.cust))}</span> <b>${esc(r.n)}</b><span class="meta">${metaOf(r)}</span></div>
+        return `<div class="prow${g ? " gk" : ""}"><div class="nm"><span class="id">${esc(badgeOf(r.id, ST.cust))}</span> <b>${r ? nameHtml(r) : ""}</b><span class="meta">${metaOf(r)}</span></div>
     <div class="step"><button data-dec="${id}" aria-label="Einmal weniger">−</button><span>${ST.sel[id]}×</span><button data-inc="${id}" aria-label="Einmal mehr">+</button></div>
     <div class="acts"><button class="btn${g ? "" : " pri"}" data-open="${id}">Kochen</button><button class="btn" data-gk="${id}" aria-pressed="${g}">${g ? "Gegessen ✓" : "Als gegessen markieren"}</button></div></div>`;
       }).join("") +

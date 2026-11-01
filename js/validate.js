@@ -84,6 +84,21 @@ function flagMap(v){
   return o;
 }
 
+/* Alte Haken sind 1. Neue Haken merken sich die Uhrzeit. */
+export function sanitizeChecks(v){
+  if (!isObj(v)) return undefined;
+  const o = {};
+  for (const [k, val] of Object.entries(v)) {
+    if (typeof k !== "string" || !k || k.length > 120) continue;
+    if (val === true) { o[k] = 1; continue; }
+    const n = asNumber(val);
+    if (n == null || n <= 0) continue;
+    if (n === 1) o[k] = 1;
+    else if (n > 1e11 && n < 1e15) o[k] = Math.round(n);
+  }
+  return o;
+}
+
 function flagMapId(v){
   if (!isObj(v)) return undefined;
   const o = {};
@@ -142,7 +157,12 @@ export function sanitizeExtra(v){
     if (!isObj(x)) continue;
     const t = str(x.t, 60);
     if (!t) continue;
-    out.push({ t, d: !!x.d });
+    const row = { t, d: !!x.d };
+    if (row.d) {
+      const at = asNumber(x.at);
+      if (at != null && at > 1e11 && at < 1e15) row.at = Math.round(at);
+    }
+    out.push(row);
     if (out.length >= 100) break;
   }
   return out;
@@ -205,6 +225,32 @@ export function sanitizePlz(v){
   return String(v).replace(/\D/g, "").slice(0, 5);
 }
 
+const DIET_OK = new Set(["vegan","vegetarisch","fleisch"]);
+
+export function sanitizeDiet(v){
+  if (!isObj(v)) return undefined;
+  const o = {};
+  for (const [k, val] of Object.entries(v)) {
+    if (!ID_RE.test(k) || !DIET_OK.has(val)) continue;
+    o[k] = val;
+    if (Object.keys(o).length >= 400) break;
+  }
+  return o;
+}
+
+export function sanitizeOv(v){
+  if (!isObj(v)) return undefined;
+  const o = {};
+  for (const [k, r] of Object.entries(v)) {
+    if (!ID_RE.test(k) || !isObj(r)) continue;
+    const s = sanitizeRecipe(Object.assign({}, r, { id: k }));
+    if (!s) continue;
+    o[k] = s;
+    if (Object.keys(o).length >= 300) break;
+  }
+  return o;
+}
+
 export function sanitizeCust(v){
   if (!Array.isArray(v)) return undefined;
   const out = [];
@@ -222,7 +268,8 @@ export function sanitizeCust(v){
 export function sanitizeField(k, v){
   switch (k) {
     case "sel": return sanitizeSel(v);
-    case "sc":
+    case "sc": return sanitizeChecks(v);
+    case "sx":
     case "fr": return flagMap(v);
     case "done": return flagMapId(v);
     case "cust": return sanitizeCust(v);
@@ -235,6 +282,8 @@ export function sanitizeField(k, v){
     case "stores": return sanitizeStringList(v, 20, 40);
     case "wish": return sanitizeStringList(v, 80, 60);
     case "extra": return sanitizeExtra(v);
+    case "ov": return sanitizeOv(v);
+    case "diet": return sanitizeDiet(v);
     default: return undefined;
   }
 }
@@ -315,7 +364,7 @@ export function sanitizeRc(v){
 export function sanitizeState(raw){
   const src = isObj(raw) ? raw : {};
   const out = { v:1, u: asNumber(src.u) || 0, sel:{}, sc:{}, rc: sanitizeRc(src.rc) };
-  for (const k of ["sel","sc","fr","cust","done","offers","week","rate","aoffers","plz","stores","wish","extra","offerUrl"]) {
+  for (const k of ["sel","sc","fr","cust","done","offers","week","rate","aoffers","plz","stores","wish","extra","offerUrl","ov","diet","sx"]) {
     const empty = (k === "plz" || k === "offerUrl") ? "" : (k === "cust" || k === "offers" || k === "stores" || k === "wish" || k === "extra" ? [] : {});
     const c = src[k] === undefined ? empty : sanitizeField(k, src[k]);
     out[k] = c === undefined ? empty : c;

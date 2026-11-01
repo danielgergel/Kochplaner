@@ -13,7 +13,8 @@ import { closePanel } from "./panels.js";
 import { openHh, bindSettings } from "./settings.js";
 import { readHash, wireHooks, initFirebase } from "./sync.js";
 
-catalog.all = loadBuiltinRecipes();
+catalog.base = loadBuiltinRecipes();
+catalog.all = {};
 rebuildAll();
 
 function render(){
@@ -72,6 +73,12 @@ function bindCore(){
       $("#list").innerHTML = listHtml();
       return;
     }
+    if (d.fd) {
+      ui.fd = d.fd;
+      document.querySelectorAll("#dietchips button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.fd === ui.fd)));
+      $("#list").innerHTML = listHtml();
+      return;
+    }
     if (d.open) { openRecipe(d.open); return; }
     if (d.add) {
       if (ST.sel[d.add]) delete ST.sel[d.add]; else ST.sel[d.add] = 1;
@@ -88,7 +95,7 @@ function bindCore(){
       return;
     }
     if (d.sc !== undefined) {
-      if (ST.sc[d.sc]) delete ST.sc[d.sc]; else ST.sc[d.sc] = 1;
+      if (ST.sc[d.sc]) delete ST.sc[d.sc]; else ST.sc[d.sc] = Date.now();
       persist();
       const y = window.scrollY;
       render();

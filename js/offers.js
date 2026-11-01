@@ -141,6 +141,21 @@ function online(){
   return typeof navigator === "undefined" || navigator.onLine !== false;
 }
 
+export function partitionOffers(items, hitCount, skippedAt){
+  const shown = [], rest = [];
+  (items || []).forEach((item, i) => {
+    const skipped = !!(skippedAt && skippedAt(item, i));
+    if (!skipped && hitCount(item) > 0) shown.push(item);
+    else rest.push(item);
+  });
+  return { shown, rest };
+}
+
+export function noOfferLabel(n){
+  const x = Number(n) || 0;
+  return x === 1 ? "1 Artikel ohne Angebot" : x + " Artikel ohne Angebot";
+}
+
 export function itemOfferHtml(item, hits, opts){
   const o = opts || {};
   const rows = (hits || []).map(h => {
@@ -158,7 +173,9 @@ export function itemOfferHtml(item, hits, opts){
     const u = searchUrls(item, o.zip || "");
     links = `<div class="alts" style="margin-top:6px"><a class="chipb" href="${esc(u.marktguru)}" target="_blank" rel="noopener">marktguru</a><a class="chipb" href="${esc(u.kaufda)}" target="_blank" rel="noopener">kaufDA</a></div>`;
   }
-  const empty = rows ? "" : `<span class="meta" style="display:block">${o.skipped ? "Dieser Artikel wurde nicht geprüft." : "Kein passendes Angebot."}</span>`;
+  const empty = rows ? "" : (o.compact
+    ? (o.skipped ? `<span class="meta" style="display:block">nicht geprüft</span>` : "")
+    : `<span class="meta" style="display:block">${o.skipped ? "Dieser Artikel wurde nicht geprüft." : "Kein passendes Angebot."}</span>`);
   return `<div class="ofr"><b>${esc(item)}</b>${empty}${rows}${links}</div>`;
 }
 
@@ -176,14 +193,20 @@ export function offersHtml(){
   else if (when) status = "Zuletzt geprüft am " + when + ". Die Angaben kommen von marktguru und können abweichen.";
   else status = "Mit dem Knopf sucht die App in den gewählten Läden. Ohne Netz bleibt die letzte Liste stehen.";
   const failed = new Set(box.failed || []);
-  const body = items.length
-    ? items.map((item, i) => itemOfferHtml(item, hitsFor(item), {
-        today: dkey(new Date()),
-        fallback: err || failed.has(item) || i >= MAX_ITEMS,
-        skipped: i >= MAX_ITEMS && !box.byItem[item],
-        zip,
-      })).join("")
-    : '<p class="empty" style="padding:6px 0">Die Einkaufsliste ist leer.</p>';
+  const today = dkey(new Date());
+  const skippedAt = (item, i) => i >= MAX_ITEMS && !box.byItem[item];
+  const parts = partitionOffers(items, item => hitsFor(item).length, skippedAt);
+  const body = !items.length
+    ? '<p class="empty" style="padding:6px 0">Die Einkaufsliste ist leer.</p>'
+    : parts.shown.map(item => itemOfferHtml(item, hitsFor(item), { today, zip })).join("")
+      + (parts.rest.length ? `<details class="quiet" id="no-offers"${ui.noOfferOpen ? " open" : ""}><summary>${esc(noOfferLabel(parts.rest.length))}</summary>${parts.rest.map(item => {
+          const i = items.indexOf(item);
+          return itemOfferHtml(item, [], {
+            today, zip, compact: true,
+            fallback: err || failed.has(item) || i >= MAX_ITEMS,
+            skipped: skippedAt(item, i),
+          });
+        }).join("")}</details>` : "");
   return `<h3 class="sec">Angebote</h3>
   <div class="box" style="padding:12px">
    <button class="btn pri" id="of-refresh" style="width:100%"${ui.offerBusy ? " disabled" : ""}>Angebote aktualisieren</button>

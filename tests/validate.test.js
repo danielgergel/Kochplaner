@@ -62,4 +62,18 @@ test("Sicherung behält nur gültige Felder", () => {
   assert.equal(st.extra[0].d, true);
   assert.equal(st.plz, "76133");
   assert.deepEqual(st.rate, { F1:2 });
+  assert.deepEqual(st.ov, {});
+  assert.deepEqual(st.diet, {});
+  assert.deepEqual(st.sx, {});
+  const checks = sanitizeField("sc", { "G|Milch|l": 1, "G|Reis|g": 1760000000000, "x": 0, "": 5 });
+  assert.equal(checks["G|Milch|l"], 1);
+  assert.equal(checks["G|Reis|g"], 1760000000000);
+  assert.equal(checks.x, undefined);
+  const extra = sanitizeField("extra", [{ t:"Salz", d:true, at:1760000000000 }, { t:"Pfeffer", d:false, at:1760000000000 }]);
+  assert.equal(extra[0].at, 1760000000000);
+  assert.equal(extra[1].at, undefined);
+  const ov = sanitizeField("ov", { M1:{ id:"M1", n:"Neue Pfanne", z:["200 g Reis"], s:["Kochen."], k:10, p:2 } });
+  assert.equal(ov.M1.id, "M1");
+  assert.equal(ov.M1.n, "Neue Pfanne");
+  assert.deepEqual(sanitizeField("diet", { M1:"vegan", M2:"rohes Fleisch", F1:"vegetarisch" }), { M1:"vegan", F1:"vegetarisch" });
 });

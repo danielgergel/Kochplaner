@@ -3,6 +3,59 @@ import { $, esc, toast, ck, dkey } from "./util.js";
 import { CATS, shopList } from "./shopcalc.js";
 import { offersHtml, refreshOffers } from "./offers.js";
 
+export const CHECK_MS = 30 * 60 * 1000;
+
+export function expireChecked(sc, extra, sx, now, ms){
+  const nextSc = Object.assign({}, sc || {});
+  const nextSx = Object.assign({}, sx || {});
+  let changed = false;
+  const limit = ms == null ? CHECK_MS : ms;
+  for (const [k, v] of Object.entries(nextSc)) {
+    const n = typeof v === "number" ? v : 0;
+    if (n > 1e11 && now - n >= limit) {
+      delete nextSc[k];
+      nextSx[k] = 1;
+      changed = true;
+    }
+  }
+  const nextExtra = (extra || []).filter(x => {
+    if (x && x.d && typeof x.at === "number" && x.at > 1e11 && now - x.at >= limit) { changed = true; return false; }
+    return true;
+  });
+  return { sc: nextSc, extra: nextExtra, sx: nextSx, changed };
+}
+
+function ensureMaps(){
+  if (!ST.sc || typeof ST.sc !== "object" || Array.isArray(ST.sc)) ST.sc = {};
+  if (!ST.sx || typeof ST.sx !== "object" || Array.isArray(ST.sx)) ST.sx = {};
+  if (!Array.isArray(ST.extra)) ST.extra = [];
+}
+
+export function applyExpire(now){
+  ensureMaps();
+  const r = expireChecked(ST.sc, ST.extra, ST.sx, now || Date.now(), CHECK_MS);
+  if (!r.changed) return false;
+  ST.sc = r.sc;
+  ST.extra = r.extra;
+  ST.sx = r.sx;
+  persist();
+  return true;
+}
+
+function hidden(key){ return !!(ST.sx && ST.sx[key]); }
+
+function checkedN(){
+  ensureMaps();
+  let n = 0;
+  if (nSel()) {
+    const L = shopList(ST.sel);
+    CATS.forEach(c => (L.out[c] || []).forEach(x => { if (ST.sc[x.key] && !hidden(x.key)) n++; }));
+    (L.vor || []).forEach(v => { if (ST.sc["V|" + v] && !hidden("V|" + v)) n++; });
+  }
+  exList().forEach(x => { if (x && x.d) n++; });
+  return n;
+}
+
 const STORES = ["REWE","Lidl","Aldi","Edeka","Kaufland","Penny","Netto","Anderer"];
 const okDate = u => typeof u === "string" && /^\d{4}-\d{2}-\d{2}$/.test(u);
 const ofDate = u => { if (!okDate(u)) return ""; const [a, b, c] = u.split("-"); return " bis " + c + "." + b + "."; };
@@ -57,17 +110,47 @@ function shopCore(){
   const L = shopList(ST.sel);
   let total = 0, done = 0;
   const secs = CATS.map(c => {
-    const it = L.out[c];
+    const it = (L.out[c] || []).filter(x => !hidden(x.key));
     if (!it.length) return "";
     it.forEach(x => { total++; if (ST.sc[x.key]) done++; });
     return `<h3 class="sec">${c}</h3><div class="box">${it.map(x => `<button class="ck" role="checkbox" aria-checked="${!!ST.sc[x.key]}" data-sc="${esc(x.key)}"><i>${ck}</i><span class="l">${esc(x.l)}${x.sub ? `<small>${esc(x.sub)}</small>` : ""}</span><span class="q">${esc(x.q)}</span></button>`).join("")}</div>`;
   }).join("");
-  const vor = L.vor.length ? `<h3 class="sec">Zuhause prüfen</h3><div class="vor">${L.vor.map(v => `<button data-sc="V|${esc(v)}" aria-pressed="${!!ST.sc["V|" + v]}">${esc(v)}</button>`).join("")}</div>` : "";
+  const vorItems = (L.vor || []).filter(v => !hidden("V|" + v));
+  const vor = vorItems.length ? `<h3 class="sec">Zuhause prüfen</h3><div class="vor">${vorItems.map(v => `<button data-sc="V|${esc(v)}" aria-pressed="${!!ST.sc["V|" + v]}">${esc(v)}</button>`).join("")}</div>` : "";
   return `<div class="cnt">${done} von ${total} abgehakt</div>${secs}${vor}
    <p class="note">Packungsgrößen: Hack und Hähnchen in 400 g, Skyr und Quark in 500 g. Dazu kommen Basis-Gewürze (Salz, Pfeffer, Paprika-, Knoblauch-, Zwiebelpulver, Oregano).</p>
    <button class="btn" id="rst" style="width:100%">Haken zurücksetzen</button>`;
 }
-export function shopHtml(){ return exHtml() + shopCore() + offersHtml() + manualHtml(); }
+function doneBar(){
+  const n = checkedN();
+  if (!n) return "";
+  return `<button class="btn" id="scclr" style="width:100%;margin-top:8px">Erledigte löschen (${n})</button>`;
+}
+function clearDone(){
+  ensureMaps();
+  const n = checkedN();
+  if (!n) { toast("Nichts abgehakt"); return; }
+  const snap = {
+    sc: JSON.parse(JSON.stringify(ST.sc)),
+    sx: JSON.parse(JSON.stringify(ST.sx)),
+    extra: JSON.parse(JSON.stringify(ST.extra)),
+  };
+  Object.keys(ST.sc).forEach(k => { if (ST.sc[k]) { ST.sx[k] = 1; delete ST.sc[k]; } });
+  ST.extra = exList().filter(x => !x.d);
+  persist();
+  const y = window.scrollY; ui.render(); window.scrollTo(0, y);
+  toast(n === 1 ? "1 Artikel entfernt" : n + " Artikel entfernt", { label:"Rückgängig", run(){
+    ST.sc = snap.sc;
+    ST.sx = snap.sx;
+    ST.extra = snap.extra;
+    persist();
+    const y2 = window.scrollY; ui.render(); window.scrollTo(0, y2);
+  } });
+}
+export function shopHtml(){
+  applyExpire(Date.now());
+  return exHtml() + shopCore() + doneBar() + offersHtml() + manualHtml();
+}
 
 export function badges(){
   const bp = $("#bp");
@@ -76,7 +159,7 @@ export function badges(){
   if (nSel()) {
     const L = shopList(ST.sel);
     let t = 0, d = 0;
-    CATS.forEach(c => L.out[c].forEach(x => { t++; if (ST.sc[x.key]) d++; }));
+    CATS.forEach(c => (L.out[c] || []).forEach(x => { if (hidden(x.key)) return; t++; if (ST.sc[x.key]) d++; }));
     open = t - d > 0 ? t - d : "";
   }
   const extra = exList().filter(x => !x.d).length;
@@ -103,11 +186,31 @@ export function bindShopping(){
     if (d.ofx !== undefined) { ST.offers.splice(+d.ofx, 1); persist(); const y = window.scrollY; ui.render(); window.scrollTo(0, y); return; }
     if (d.exadd !== undefined) { const i = $("#ex-i"); if (exAdd(i && i.value)) exRender(true); return; }
     if (d.exsug !== undefined) { if (exAdd(d.exsug)) exRender(false); return; }
-    if (d.exck !== undefined) { const x = exList()[+d.exck]; if (x) { x.d = !x.d; persist(); exRender(false); } return; }
+    if (d.exck !== undefined) {
+      const x = exList()[+d.exck];
+      if (x) {
+        x.d = !x.d;
+        if (x.d) x.at = Date.now(); else delete x.at;
+        persist();
+        exRender(false);
+      }
+      return;
+    }
     if (d.exdel !== undefined) { exList().splice(+d.exdel, 1); persist(); exRender(false); return; }
     if (d.exclr !== undefined) { ST.extra = exList().filter(x => !x.d); persist(); exRender(false); return; }
-    if (t.id === "rst") { exList().forEach(x => { x.d = false; }); persist(); exRender(false); }
+    if (t.id === "rst") { exList().forEach(x => { x.d = false; delete x.at; }); persist(); exRender(false); return; }
+    if (t.id === "scclr") { clearDone(); return; }
+    if (ev.target.id === "no-offers") return;
   });
+  document.addEventListener("toggle", ev => {
+    if (ev.target && ev.target.id === "no-offers") ui.noOfferOpen = !!ev.target.open;
+  }, true);
+  setInterval(() => {
+    if (ui.tab !== "E") return;
+    if (applyExpire(Date.now())) {
+      const y = window.scrollY; ui.render(); window.scrollTo(0, y);
+    }
+  }, 60000);
   document.addEventListener("keydown", ev => {
     if (ev.key === "Enter" && ev.target && ev.target.id === "ex-i") {
       ev.preventDefault();
