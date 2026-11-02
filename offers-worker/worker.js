@@ -48,17 +48,28 @@ export function compactOffer(offer, item, store, zip){
   return shapeOffer(offer, item, store, zip);
 }
 
-function json(body, status, request){
-  const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
-  const origin = request.headers.get("Origin") || "";
-  if (ALLOWED_ORIGINS.some(re => re.test(origin))) {
+export function corsHeaders(origin){
+  const headers = { "cache-control": "no-store" };
+  if (ALLOWED_ORIGINS.some(re => re.test(origin || ""))) {
     headers["access-control-allow-origin"] = origin;
     headers["vary"] = "Origin";
     headers["access-control-allow-methods"] = "GET, POST, OPTIONS";
     headers["access-control-allow-headers"] = "Content-Type";
     headers["access-control-max-age"] = "86400";
   }
-  return new Response(JSON.stringify(body), { status, headers });
+  return headers;
+}
+
+export function jsonResponse(body, status, origin){
+  const headers = corsHeaders(origin);
+  const empty = status === 204 || status === 304;
+  if (!empty) headers["content-type"] = "application/json; charset=utf-8";
+  return new Response(empty ? null : JSON.stringify(body), { status, headers });
+}
+
+function json(body, status, request){
+  const origin = request.headers.get("Origin") || "";
+  return jsonResponse(body, status, origin);
 }
 
 function cacheRequest(kind, q, zip){
@@ -262,7 +273,7 @@ function rowsFor(item, rawOffers, wanted, zip){
 export default {
   async fetch(request, env, ctx){
     const url = new URL(request.url);
-    if (request.method === "OPTIONS") return json({ ok: true }, 204, request);
+    if (request.method === "OPTIONS") return json(null, 204, request);
     if (url.pathname === "/health" && request.method === "GET") return json({ ok: true }, 200, request);
     if (url.pathname !== "/offers" || request.method !== "POST") return json({ ok: false, error: "not_found" }, 404, request);
     let body;

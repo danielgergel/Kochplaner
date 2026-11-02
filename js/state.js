@@ -18,8 +18,8 @@ export const OFFK = "kochplaner.off.v1";
 export const DCK = "kochplaner.dc";
 export const DSK = "kochplaner.dsync";
 
-export const SH = ["sel","sc","fr","cust","done","offers","week","rate","aoffers","plz","stores","wish","extra","offerUrl","ov","diet","sx"];
-export const DFLT = k => (k === "plz" || k === "offerUrl") ? "" : (k === "cust" || k === "offers" || k === "stores" || k === "wish" || k === "extra" ? [] : {});
+export const SH = ["sel","sc","fr","cust","done","offers","week","rate","aoffers","plz","stores","wish","extra","offerUrl","ov","diet","sx","sxPlan"];
+export const DFLT = k => (k === "plz" || k === "offerUrl" || k === "sxPlan") ? "" : (k === "cust" || k === "offers" || k === "stores" || k === "wish" || k === "extra" ? [] : {});
 export const DEFWISH = ["Skyr","Wasser","Rinderhack mager","Tomaten","Erdbeeren","Salat","Gurke","Protein-Joghurt","Wraps","Monster Energy","Red Bull","Tortellini","Reibekäse light","Parmesan","Hähnchen-Minutenschnitzel","Hähnchenbrust","Steak mariniert","Putenschnitzel","Cola Zero","Magerquark","Hüttenkäse","Proteinriegel"];
 
 function readJSON(key){
@@ -52,6 +52,7 @@ if (!ST.done || typeof ST.done !== "object" || Array.isArray(ST.done)) ST.done =
 if (!ST.ov || typeof ST.ov !== "object" || Array.isArray(ST.ov)) ST.ov = {};
 if (!ST.diet || typeof ST.diet !== "object" || Array.isArray(ST.diet)) ST.diet = {};
 if (!ST.sx || typeof ST.sx !== "object" || Array.isArray(ST.sx)) ST.sx = {};
+if (typeof ST.sxPlan !== "string") ST.sxPlan = "";
 
 export const DY = { goal:{ k:2100, p:150 }, days:{}, foods:[] };
 {

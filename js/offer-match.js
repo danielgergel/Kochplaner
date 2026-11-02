@@ -32,6 +32,8 @@ const GROUPS = [
   ["erdnussmus","erdnussbutter","erdnusscreme"],
 ];
 
+const NONFOOD = new Set(["duschgel","shampoo","geschenkkarte","zahncreme","zahnpasta","windeln","toepfchen","spuelmittel","waschmittel"]);
+
 const BAN = {
   milch: ["hafermilch","mandelmilch","kokosmilch","sojamilch","buttermilch","kondensmilch","milchschnitte","muellermilch","reisdrink","milchshake","milchmischgetraenk","shake"],
   vollmilch: ["hafermilch","mandelmilch","kokosmilch","sojamilch","buttermilch","kondensmilch","milchschnitte","muellermilch","milchshake","milchmischgetraenk","shake"],
@@ -153,9 +155,10 @@ export function offerMatches(item, productName){
   const raw = rawTokens(productName);
   const words = raw.filter(keepToken);
   if (!words.length) return false;
+  const accepted = new Set(groupOf(head));
+  if (words.some(w => NONFOOD.has(w) && !accepted.has(w))) return false;
   const list = banList(head);
   if (words.some(w => isBannedToken(w, list)) || splitBanned(head, words)) return false;
-  const accepted = new Set(groupOf(head));
   const parts = [];
   let cur = [];
   for (const w of raw) {

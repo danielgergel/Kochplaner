@@ -4,7 +4,7 @@ import { $, toast, dkey } from "./util.js";
 import { loadBuiltinRecipes } from "./data/recipes.js";
 import { rebuildAll, cleanIds, recipesHtml, listHtml, openRecipe, closeRecipe, redrawDetail, refreshFridge, openFridge, openDice, bindRecipeDom } from "./recipes.js";
 import { planHtml, bindPlan } from "./plan.js";
-import { shopHtml, badges, bindShopping } from "./shopping.js";
+import { shopHtml, badges, bindShopping, reconcileHidden, dropHidden } from "./shopping.js";
 import { maybeRefreshOffers } from "./offers.js";
 import { drawDy, bindDiary } from "./diary.js";
 import { closeScan, bindScanner, warmupScanner } from "./scanner.js";
@@ -19,6 +19,7 @@ rebuildAll();
 
 function render(){
   cleanIds();
+  reconcileHidden();
   document.querySelectorAll("#seg button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === ui.tab)));
   $("#app").innerHTML = ui.tab === "R" ? recipesHtml() : ui.tab === "P" ? planHtml() : shopHtml();
   badges();
@@ -90,7 +91,7 @@ function bindCore(){
     if (d.inc) { ST.sel[d.inc] = Math.min(9, ST.sel[d.inc] + 1); persist(); render(); return; }
     if (d.dec) { if (ST.sel[d.dec] > 1) ST.sel[d.dec]--; else delete ST.sel[d.dec]; persist(); render(); return; }
     if (t.id === "clr") {
-      if (t.dataset.c) { ST.sel = {}; ST.rc = {}; persist(); render(); toast("Plan geleert"); }
+      if (t.dataset.c) { ST.sel = {}; ST.rc = {}; dropHidden(); persist(); render(); toast("Plan geleert"); }
       else { t.dataset.c = 1; t.textContent = "Wirklich alles entfernen?"; setTimeout(() => { if (t.isConnected) { delete t.dataset.c; t.textContent = "Plan leeren"; } }, 3500); }
       return;
     }
@@ -102,7 +103,7 @@ function bindCore(){
       window.scrollTo(0, y);
       return;
     }
-    if (t.id === "rst") { ST.sc = {}; persist(); render(); toast("Haken zurückgesetzt"); }
+    if (t.id === "rst") { ST.sc = {}; dropHidden(); persist(); render(); toast("Haken zurückgesetzt"); }
   });
   $("#bfr").addEventListener("click", () => openFridge());
   $("#bdi").addEventListener("click", () => openDice());

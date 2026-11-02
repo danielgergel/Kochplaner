@@ -33,9 +33,17 @@ function hasWord(text, keys){
   return keys.some(key => tokens.some(t => tokenHits(t, key)));
 }
 
-/** "fleisch" oder "vegetarisch". Pflanzliche Rezepte zählen als vegetarisch. */
+function withoutNegatedMeat(text){
+  return text.replace(/\bohne\s+([a-z0-9]+)/g, (all, word) => {
+    if (MEAT.some(k => tokenHits(word, k))) return " ";
+    return all;
+  });
+}
+
+/** "fleisch" oder "vegetarisch". Pflanzliche Rezepte zählen als vegetarisch.
+    „ohne Hähnchen“ zählt nicht als Fleisch. */
 export function detectDiet(lines){
-  const text = (Array.isArray(lines) ? lines : []).map(normDiet).join(" ");
+  const text = withoutNegatedMeat((Array.isArray(lines) ? lines : []).map(normDiet).join(" "));
   if (hasWord(text, MEAT)) return "fleisch";
   return "vegetarisch";
 }

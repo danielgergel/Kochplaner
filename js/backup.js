@@ -81,6 +81,7 @@ export function applyBackup(data){
   });
   if (typeof ST.plz !== "string") ST.plz = "";
   if (typeof ST.offerUrl !== "string") ST.offerUrl = "";
+  if (typeof ST.sxPlan !== "string") ST.sxPlan = "";
   rebuildAll();
   const diary = data.diary || sanitizeDiary(null);
   diary.u = Date.now();

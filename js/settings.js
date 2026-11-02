@@ -6,7 +6,7 @@ import { exportBackup, parseBackup, applyBackup, summaryOf } from "./backup.js";
 import { rebuildAll } from "./recipes.js";
 import { readTheme, saveTheme } from "./theme.js";
 
-const APPV = "02.11.2026, Stand 24";
+const APPV = "02.11.2026, Stand 25";
 const ALLSTORES = ["REWE","Lidl","Penny","Aldi","Edeka","Kaufland","Netto"];
 let pending = null;
 
