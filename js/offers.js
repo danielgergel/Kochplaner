@@ -117,7 +117,23 @@ export function normalizeHit(hit, zip){
   return asStored(shaped);
 }
 
-export function presentOffers(item, rows, today, zip){
+const CHAIN_RULES = [
+  ["REWE", /\brewe\b/],
+  ["Lidl", /\blidl\b/],
+  ["Penny", /\bpenny\b/],
+  ["Aldi", /\baldi\b/],
+  ["Edeka", /\bedeka\b|\be ?center\b|\be ?aktiv\b/],
+  ["Kaufland", /\bkaufland\b/],
+  ["Netto", /\bnetto\b/],
+];
+
+export function chainOf(name){
+  const n = String(name || "").toLowerCase().replace(/ß/g, "ss").replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue");
+  for (const [label, re] of CHAIN_RULES) if (re.test(n)) return label;
+  return String(name || "").trim();
+}
+
+export function matchedOffers(item, rows, today, zip){
   const hits = (rows || []).filter(r => offerMatches(item, r.n || r.name || ""));
   const clean = dedupeOffers(hits.map(r => {
     const n = normalizeHit(r, zip);
@@ -128,13 +144,59 @@ export function presentOffers(item, rows, today, zip){
       _hit: n,
     };
   }));
-  return sortOffers(clean, today).slice(0, 3).map(x => x._hit);
+  return sortOffers(clean, today).map(x => x._hit);
+}
+
+export function presentOffers(item, rows, today, zip){
+  return matchedOffers(item, rows, today, zip).slice(0, 3);
+}
+
+export function keepChainOffers(hits){
+  const seen = new Set();
+  const out = [];
+  for (const h of hits || []) {
+    const c = chainOf(h && (h.s || h.store) || "");
+    if (!c || seen.has(c)) continue;
+    seen.add(c);
+    out.push(h);
+  }
+  return out;
+}
+
+export function chainLabel(chain, count, total){
+  return chain + " (" + count + " von " + total + ")";
+}
+
+export function groupOffersByChain(items, hitsByItem){
+  const list = items || [];
+  const total = list.length;
+  const map = new Map();
+  const rest = [];
+  for (const item of list) {
+    const hits = (hitsByItem ? hitsByItem(item) : []) || [];
+    const by = new Map();
+    for (const h of hits) {
+      const c = chainOf(h && (h.s || h.store) || "");
+      if (!c) continue;
+      if (!by.has(c)) by.set(c, []);
+      by.get(c).push(h);
+    }
+    if (!by.size) { rest.push(item); continue; }
+    for (const [c, chainHits] of by) {
+      if (!map.has(c)) map.set(c, []);
+      map.get(c).push({ item, hits: chainHits });
+    }
+  }
+  const stores = [...map.entries()].map(([chain, rows]) => ({
+    chain, count: rows.length, total, rows,
+  })).sort((a, b) => b.count - a.count || a.chain.localeCompare(b.chain, "de"));
+  return { stores, rest, total };
 }
 
 export function hitsFor(item, today){
   const box = cacheBox();
   const auto = Array.isArray(box.byItem[item]) ? box.byItem[item] : [];
-  return presentOffers(item, auto.concat(manualHits(item)), today || dkey(new Date()), zipOf());
+  return keepChainOffers(matchedOffers(item, auto.concat(manualHits(item)), today || dkey(new Date()), zipOf()));
 }
 
 function online(){
@@ -195,18 +257,24 @@ export function offersHtml(){
   const failed = new Set(box.failed || []);
   const today = dkey(new Date());
   const skippedAt = (item, i) => i >= MAX_ITEMS && !box.byItem[item];
-  const parts = partitionOffers(items, item => hitsFor(item).length, skippedAt);
+  const grouped = groupOffersByChain(items, item => hitsFor(item));
+  const chains = ui.offerChains || {};
+  const storeHtml = grouped.stores.map(s => {
+    const open = chains[s.chain] ? " open" : "";
+    const rows = s.rows.map(row => itemOfferHtml(row.item, row.hits, { today, zip })).join("");
+    return `<details class="quiet chain" data-chain="${esc(s.chain)}"${open}><summary>${esc(chainLabel(s.chain, s.count, s.total))}</summary>${rows}</details>`;
+  }).join("");
+  const restHtml = grouped.rest.length ? `<details class="quiet" id="no-offers"${ui.noOfferOpen ? " open" : ""}><summary>${esc(noOfferLabel(grouped.rest.length))}</summary>${grouped.rest.map(item => {
+    const i = items.indexOf(item);
+    return itemOfferHtml(item, [], {
+      today, zip, compact: true,
+      fallback: err || failed.has(item) || i >= MAX_ITEMS,
+      skipped: skippedAt(item, i),
+    });
+  }).join("")}</details>` : "";
   const body = !items.length
     ? '<p class="empty" style="padding:6px 0">Die Einkaufsliste ist leer.</p>'
-    : parts.shown.map(item => itemOfferHtml(item, hitsFor(item), { today, zip })).join("")
-      + (parts.rest.length ? `<details class="quiet" id="no-offers"${ui.noOfferOpen ? " open" : ""}><summary>${esc(noOfferLabel(parts.rest.length))}</summary>${parts.rest.map(item => {
-          const i = items.indexOf(item);
-          return itemOfferHtml(item, [], {
-            today, zip, compact: true,
-            fallback: err || failed.has(item) || i >= MAX_ITEMS,
-            skipped: skippedAt(item, i),
-          });
-        }).join("")}</details>` : "");
+    : storeHtml + restHtml;
   return `<h3 class="sec">Angebote</h3>
   <div class="box" style="padding:12px">
    <button class="btn pri" id="of-refresh" style="width:100%"${ui.offerBusy ? " disabled" : ""}>Angebote aktualisieren</button>
@@ -231,7 +299,7 @@ function remember(data, items){
       url: typeof r.url === "string" && /^https:\/\//.test(r.url) ? r.url.slice(0, 300) : "",
       note: String(r.note || "").slice(0, 80),
     }));
-    byItem[item] = presentOffers(item, raw, dkey(new Date()), zipOf());
+    byItem[item] = keepChainOffers(matchedOffers(item, raw, dkey(new Date()), zipOf()));
   });
   ST.aoffers = { at: dkey(new Date()), ts: Date.now(), byItem, failed, items: [] };
   persist();

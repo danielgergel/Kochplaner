@@ -235,8 +235,8 @@ body{padding-top:env(safe-area-inset-top,0px)}
 .ic svg{width:22px;height:22px}
 .ic svg .pip{fill:currentColor;stroke:none}
 @media (max-width:360px){.ic button span{font-size:9px}}
-.dietmark{display:inline-flex;vertical-align:-3px;margin-left:4px}
-.dietmark svg{width:16px;height:16px;stroke:var(--accent);stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.dietmark{display:inline-flex;align-items:center;justify-content:center;margin-left:6px;min-width:16px;height:16px;padding:0 4px;border-radius:5px;background:var(--surface2);color:var(--accent);font-family:var(--f-disp);font-weight:700;font-size:13px;line-height:1;letter-spacing:0;vertical-align:1px}
+details.chain>summary{font-family:var(--f-disp);font-size:20px;letter-spacing:.02em;color:var(--fg);text-transform:none}
 .ckpair{display:grid;grid-template-columns:46px 1fr;align-items:stretch;background:var(--surface);border-top:1px solid var(--line)}
 .box>.ckpair:first-child{border-top:0}
 .ckpair .ck{border-top:0;width:46px;min-height:52px;padding-right:0}
