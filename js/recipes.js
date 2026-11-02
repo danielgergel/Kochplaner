@@ -7,6 +7,9 @@ import { NSVIDEO } from "./data/wake.js";
 import { showPanel, closePanel, setDiceTimer, clearDiceTimer } from "./panels.js";
 import { parseRecipeText } from "./ocr-text.js";
 import { badgeOf, haystack, idNumber } from "./recipe-badge.js";
+
+let shareHook = () => {};
+export function setShareHook(fn){ shareHook = fn; }
 import { dietOf, dietMark, dietPasses } from "./diet.js";
 import { substituteFor, substituteById } from "./data/subs.js";
 
@@ -129,7 +132,7 @@ export function listHtml(){
 }
 export function recipesHtml(){
   const diets = [["Alle","Alle"],["Vegetarisch","v Vegetarisch"]];
-  return `<div class="tools"><input id="q" type="search" placeholder="Rezept suchen" value="${esc(ui.fq)}" aria-label="Rezept suchen"><div class="chips" id="chips">${GROUPS.map(g => `<button data-g="${g}" aria-pressed="${g === ui.fg}">${g}</button>`).join("")}</div><div class="chips" id="dietchips">${diets.map(([g, label]) => `<button data-fd="${g}" aria-pressed="${g === (ui.fd || "Alle")}">${label}</button>`).join("")}</div></div><button class="btn" id="newrec" style="width:100%;margin-bottom:10px">Eigenes Rezept anlegen</button><div id="list">${listHtml()}</div>`;
+  return `<div class="tools"><input id="q" type="search" placeholder="Rezept suchen" value="${esc(ui.fq)}" aria-label="Rezept suchen"><div class="chips" id="chips">${GROUPS.map(g => `<button data-g="${g}" aria-pressed="${g === ui.fg}">${g}</button>`).join("")}</div><div class="chips" id="dietchips">${diets.map(([g, label]) => `<button data-fd="${g}" aria-pressed="${g === (ui.fd || "Alle")}">${label}</button>`).join("")}</div></div><div class="drow" style="margin-top:0"><button class="btn" id="friends" style="flex:1">Freunde</button><button class="btn" id="newrec" style="flex:1">Eigenes Rezept</button></div><div id="list">${listHtml()}</div>`;
 }
 
 export function detailHtml(id){
@@ -144,6 +147,10 @@ export function detailHtml(id){
   if (r.cust) extra += `<button class="btn warn" data-crdel="${id}">Löschen</button>`;
   else if (ST.ov && ST.ov[id]) extra += `<button class="btn" data-crorig="${id}">Original wiederherstellen</button>`;
   extra += `</div>`;
+  if (r.cust || (ST.ov && ST.ov[id])) {
+    const on = !!(ST.share && ST.share[id]);
+    extra += `<div class="drow"><button class="btn" data-share aria-pressed="${on}">${on ? "Geteilt" : "Teilen"}</button></div>`;
+  }
   return `<div class="dtop"><div class="in"><button class="back" id="back">Zurück</button><span class="wk" id="wk">Bildschirm wird geprüft</span></div></div>
   <div class="dbody"><h2>${nameHtml(r)}</h2>
    <div class="tags"><span class="tag">${esc(badgeOf(r.id, ST.cust))}</span><span class="tag">${r.k} kcal${r.u && /pro /.test(r.u) ? "" : " pro Person"}</span><span class="tag">${r.p} g Eiweiß${r.u && /pro /.test(r.u) ? "" : " pro Person"}</span><span class="tag">${esc(r.t)}</span></div>
@@ -378,6 +385,7 @@ export function saveCr(id){
   closePanel();
   if (ui.openId) redrawDetail();
   toast("Rezept gespeichert");
+  shareHook(rec.id, "save");
 }
 function sameAsBase(base, rec){
   const sameList = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
@@ -499,6 +507,7 @@ export function bindRecipeDom(){
     if (!t || !ui.openId) return;
     const d = t.dataset;
     if (t.id === "back") { closeRecipe(); return; }
+    if (d.share !== undefined) { shareHook(ui.openId, "toggle"); return; }
     if (d.sub) { openSub(d.sub); return; }
     const rc = ST.rc[ui.openId] || (ST.rc[ui.openId] = { z:{}, s:{} });
     if (d.rz !== undefined) { if (rc.z[d.rz]) delete rc.z[d.rz]; else rc.z[d.rz] = 1; persist(); redrawDetail(); return; }
@@ -516,9 +525,11 @@ export function bindRecipeDom(){
     if (!t) return;
     const d = t.dataset;
     if (t.id === "newrec") { openCr(""); return; }
+    if (t.id === "friends") { shareHook("", "friends"); return; }
     if (d.crsave !== undefined) { saveCr(d.crsave); return; }
     if (d.cred) { openCr(d.cred); return; }
     if (d.crorig) {
+      shareHook(d.crorig, "restore");
       if (ST.ov) delete ST.ov[d.crorig];
       rebuildAll();
       persist();
@@ -529,6 +540,7 @@ export function bindRecipeDom(){
     if (d.subx !== undefined) { const pop = $("#subpop"); if (pop) pop.hidden = true; return; }
     if (d.crdel) {
       if (t.dataset.c) {
+        shareHook(d.crdel, "delete");
         ST.cust = ST.cust.filter(c => c.id !== d.crdel);
         delete ST.sel[d.crdel];
         delete ST.rc[d.crdel];

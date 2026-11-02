@@ -320,10 +320,12 @@ function openFirestore(initializeFirestore, app, persistentLocalCache, persisten
   } catch (e) {}
   return initializeFirestore(app, base);
 }
+export function firebaseReady(){ return FB; }
+
 export async function initFirebase(){
   try {
     const { initializeApp } = await import("../vendor/firebase/firebase-app.js");
-    const { initializeFirestore, doc, onSnapshot, setDoc, persistentLocalCache, persistentMultipleTabManager, setLogLevel } = await import("../vendor/firebase/firebase-firestore.js");
+    const { initializeFirestore, doc, onSnapshot, setDoc, getDoc, getDocs, collection, query, orderBy, limit, startAt, endAt, documentId, writeBatch, runTransaction, persistentLocalCache, persistentMultipleTabManager, setLogLevel } = await import("../vendor/firebase/firebase-firestore.js");
     setLogLevel("silent");
     const app = initializeApp({
       apiKey:"AIzaSyAJSl4t2Mj9uVev5jg2gcbzpQQermiZA4M",
@@ -334,7 +336,7 @@ export async function initFirebase(){
       appId:"1:1049347489480:web:f0bcd79568d69ab1cbaffd",
     });
     const db = openFirestore(initializeFirestore, app, persistentLocalCache, persistentMultipleTabManager);
-    FB = { db, doc, onSnapshot, setDoc };
+    FB = { db, doc, onSnapshot, setDoc, getDoc, getDocs, collection, query, where, orderBy, limit, startAt, endAt, documentId, writeBatch, runTransaction };
     window.FB = FB;
     startSync();
     dStart();

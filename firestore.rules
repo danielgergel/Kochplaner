@@ -1,0 +1,124 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function userName(name) {
+      return name.matches('^[a-z0-9_]{3,20}$');
+    }
+    function tokenOk(token) {
+      return token is string && token.matches('^[a-z0-9]{32}$');
+    }
+    function secretPath(name) {
+      return /databases/$(database)/documents/secrets/$(name);
+    }
+    function secretData(name) {
+      return get(secretPath(name)).data;
+    }
+    function outboxPath(name, id) {
+      return /databases/$(database)/documents/outbox/$(secretData(name).token)/recipes/$(id);
+    }
+    function shareOk(name, id) {
+      let d = request.resource.data;
+      return userName(name)
+        && id.matches('^[A-Za-z][A-Za-z0-9_-]{0,40}$')
+        && d.keys().hasOnly(['id', 'n', 'c', 'k', 'p', 't', 'z', 's', 'veg', 'note', 'gone', 'u'])
+        && d.id == id
+        && d.n is string && d.n.size() > 0 && d.n.size() <= 80
+        && d.c is string && d.c.size() <= 80
+        && d.k is int && d.k >= 0 && d.k <= 8000
+        && d.p is int && d.p >= 0 && d.p <= 800
+        && d.t is string && d.t.size() > 0 && d.t.size() <= 40
+        && d.z is list && d.z.size() > 0 && d.z.size() <= 40
+        && d.s is list && d.s.size() > 0 && d.s.size() <= 40
+        && d.veg is bool
+        && d.gone is bool
+        && d.u is int && d.u > 0
+        && (!('note' in d) || (d.note is string && d.note.size() <= 200))
+        && exists(secretPath(name))
+        && secretData(name).released != true
+        && tokenOk(secretData(name).token)
+        && getAfter(outboxPath(name, id)).data.username == name
+        && getAfter(outboxPath(name, id)).data.id == id
+        && getAfter(outboxPath(name, id)).data.u == d.u
+        && (!exists(outboxPath(name, id)) || get(outboxPath(name, id)).data.u != d.u);
+    }
+
+    // Haushalt und Tagebuch: der geheime Code ist die Dokument-ID.
+    // Wenn in der Konsole schon andere Regeln für diese beiden Sammlungen stehen, diese beiden Blöcke an die bestehenden anpassen und nicht blind ersetzen.
+    match /households/{code} {
+      allow read, write: if code.matches('^[a-z0-9]{16,64}$');
+    }
+    match /diaries/{code} {
+      allow read, write: if code.matches('^[a-z0-9]{16,64}$');
+    }
+
+    // Öffentliches Profil. Der geheime Schreibschlüssel steht hier nicht.
+    match /profiles/{name} {
+      allow read: if userName(name);
+      allow create: if userName(name)
+        && request.resource.data.keys().hasOnly(['name', 'u', 'released'])
+        && request.resource.data.name == name
+        && request.resource.data.released == false
+        && request.resource.data.u is int
+        && !exists(secretPath(name))
+        && getAfter(secretPath(name)).data.released == false
+        && tokenOk(getAfter(secretPath(name)).data.token);
+      allow update: if userName(name)
+        && request.resource.data.keys().hasOnly(['name', 'u', 'released'])
+        && request.resource.data.name == name
+        && request.resource.data.u is int
+        && exists(secretPath(name))
+        && getAfter(secretPath(name)).data.token == secretData(name).token
+        && (
+          (resource.data.released != true && request.resource.data.released == true && getAfter(secretPath(name)).data.released == true)
+          || (resource.data.released == true && request.resource.data.released == false && getAfter(secretPath(name)).data.released == false)
+        );
+      allow delete: if false;
+    }
+
+    // Nur der Besitzer kennt den Schlüssel. Lesen vom Client ist verboten, Regeln dürfen ihn prüfen.
+    match /secrets/{name} {
+      allow read: if false;
+      allow create: if userName(name)
+        && !exists(secretPath(name))
+        && request.resource.data.keys().hasOnly(['token', 'u', 'released'])
+        && tokenOk(request.resource.data.token)
+        && request.resource.data.released == false
+        && request.resource.data.u is int
+        && getAfter(/databases/$(database)/documents/profiles/$(name)).data.name == name
+        && getAfter(/databases/$(database)/documents/profiles/$(name)).data.released == false;
+      allow update: if userName(name)
+        && request.resource.data.keys().hasOnly(['token', 'u', 'released'])
+        && request.resource.data.u is int
+        && tokenOk(request.resource.data.token)
+        && (
+          (request.resource.data.token == resource.data.token
+            && (request.resource.data.released == resource.data.released || request.resource.data.released == true))
+          || (resource.data.released == true && request.resource.data.released == false)
+        );
+      allow delete: if false;
+    }
+
+    // Beweis für genau diese eine Schreibaktion. Nicht öffentlich lesbar.
+    match /outbox/{token}/recipes/{id} {
+      allow read: if false;
+      allow create, update: if tokenOk(token)
+        && id.matches('^[A-Za-z][A-Za-z0-9_-]{0,40}$')
+        && request.resource.data.keys().hasOnly(['username', 'id', 'u'])
+        && request.resource.data.id == id
+        && userName(request.resource.data.username)
+        && request.resource.data.u is int
+        && request.resource.data.u > 0
+        && exists(secretPath(request.resource.data.username))
+        && secretData(request.resource.data.username).token == token
+        && secretData(request.resource.data.username).released != true;
+      allow delete: if false;
+    }
+
+    // Geteilte Rezepte: jeder darf lesen, nur der Besitzer des Namens darf schreiben.
+    match /shares/{name}/recipes/{id} {
+      allow read: if userName(name);
+      allow create, update: if shareOk(name, id);
+      allow delete: if false;
+    }
+  }
+}

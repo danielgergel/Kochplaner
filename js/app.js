@@ -12,7 +12,10 @@ import { bindOcr } from "./ocr.js";
 import { closePanel } from "./panels.js";
 import { openHh, bindSettings } from "./settings.js";
 import { readHash, wireHooks, initFirebase } from "./sync.js";
+import { setShareHook } from "./recipes.js";
+import { bindShare, openFriends, onRecipeEvent } from "./share.js";
 
+setShareHook((id, ev) => { if (ev === "friends") openFriends(); else onRecipeEvent(id, ev); });
 catalog.base = loadBuiltinRecipes();
 catalog.all = {};
 rebuildAll();
@@ -146,6 +149,7 @@ bindShopping();
 bindScanner();
 bindOcr();
 bindSettings();
+bindShare();
 new MutationObserver(enhanceClear).observe(document.body, { childList:true, subtree:true });
 enhanceClear();
 render();
