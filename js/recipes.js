@@ -139,7 +139,7 @@ export function listHtml(){
 }
 export function recipesHtml(){
   const diets = [["Alle","Alle"],["Vegetarisch","v Vegetarisch"]];
-  return `<div class="tools"><input id="q" type="search" placeholder="Rezept oder Zutat suchen" value="${esc(ui.fq)}" aria-label="Rezept oder Zutat suchen"><div class="chips" id="chips">${GROUPS.map(g => `<button data-g="${g}" aria-pressed="${g === ui.fg}">${g}</button>`).join("")}</div><div class="chips" id="dietchips">${diets.map(([g, label]) => `<button data-fd="${g}" aria-pressed="${g === (ui.fd || "Alle")}">${label}</button>`).join("")}</div></div><div class="drow" style="margin-top:0"><button class="btn" id="friends" style="flex:1">Freunde</button><button class="btn" id="newrec" style="flex:1">Eigenes Rezept</button></div><div id="list">${listHtml()}</div>`;
+  return `<div class="tools"><input id="q" type="search" placeholder="Rezept oder Zutat suchen" value="${esc(ui.fq)}" aria-label="Rezept oder Zutat suchen"><div class="chips" id="chips">${GROUPS.map(g => `<button data-g="${g}" aria-pressed="${g === ui.fg}">${g}</button>`).join("")}</div><div class="chips" id="dietchips">${diets.map(([g, label]) => `<button data-fd="${g}" aria-pressed="${g === (ui.fd || "Alle")}">${label}</button>`).join("")}</div></div><div class="recline"><button class="btn" id="friends">Freunde</button><button class="btn" id="newrec">Eigenes Rezept</button></div><div id="list">${listHtml()}</div>`;
 }
 
 export function detailHtml(id){
