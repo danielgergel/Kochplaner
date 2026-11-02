@@ -325,7 +325,7 @@ export function firebaseReady(){ return FB; }
 export async function initFirebase(){
   try {
     const { initializeApp } = await import("../vendor/firebase/firebase-app.js");
-    const { initializeFirestore, doc, onSnapshot, setDoc, getDoc, getDocs, collection, query, orderBy, limit, startAt, endAt, documentId, writeBatch, runTransaction, persistentLocalCache, persistentMultipleTabManager, setLogLevel } = await import("../vendor/firebase/firebase-firestore.js");
+    const { initializeFirestore, doc, onSnapshot, setDoc, getDoc, getDocs, collection, query, where, orderBy, limit, startAt, endAt, documentId, writeBatch, runTransaction, persistentLocalCache, persistentMultipleTabManager, setLogLevel } = await import("../vendor/firebase/firebase-firestore.js");
     setLogLevel("silent");
     const app = initializeApp({
       apiKey:"AIzaSyAJSl4t2Mj9uVev5jg2gcbzpQQermiZA4M",
@@ -342,7 +342,9 @@ export async function initFirebase(){
     dStart();
     chip();
     if (ui.pm === "H") ui.openHh();
-  } catch (e) {}
+  } catch (e) {
+    console.error("Firebase konnte nicht starten", e);
+  }
 }
 
 if (typeof window !== "undefined") {
