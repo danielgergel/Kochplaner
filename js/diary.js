@@ -196,13 +196,19 @@ export function drawDy(keep){
   pnl.innerHTML = dyHtml();
   pnl.scrollTop = keep ? y : 0;
 }
-export function openDy(){
+export function openDy(opts){
   ui.pm = "Y";
-  ui.dyq = "";
-  ui.undo = null;
-  ui.dyk = dkey(new Date());
+  const keep = !!(opts && opts.keep);
+  if (!keep) {
+    ui.dyq = "";
+    ui.undo = null;
+    ui.dyk = dkey(new Date());
+  }
+  const pnl = $("#pnl");
+  const y = pnl ? pnl.scrollTop : 0;
   showPanel("");
   drawDy(false);
+  if (keep && pnl) pnl.scrollTop = y;
 }
 
 export function bindDiary(){
@@ -309,7 +315,7 @@ export function bindDiary(){
         return;
       }
       if (d.sgadd) { markEaten(d.sgadd); drawDy(true); toast("Eingetragen"); return; }
-      if (d.sgopen) { ui.closePanel(); ui.openRecipe(d.sgopen); return; }
+      if (d.sgopen) { ui.openRecipe(d.sgopen, "Y"); return; }
     }
   });
   document.addEventListener("toggle", ev => {
