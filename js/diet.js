@@ -1,4 +1,5 @@
-/* Erkennt vegan / vegetarisch aus den Zutaten. Manuelle Wahl hat Vorrang. */
+/* Erkennt vegetarische Rezepte. Eine gespeicherte Wahl hat Vorrang.
+   Ein alter Eintrag „vegan“ gilt als vegetarisch. */
 
 const MEAT = [
   "haehnchen","huhn","huehner","pute","puten","rind","rinder","hackfleisch","hack",
@@ -8,15 +9,6 @@ const MEAT = [
   "sardinen","meeresfruechte","kalb","wild","reh","hirsch","gans","hering","makrele",
   "muschel","tintenfisch","scholle","krebs","chorizo",
 ];
-
-const DAIRY = [
-  "milch","sahne","joghurt","skyr","quark","kaese","butter","ei","eier","eigelb","eiweiss",
-  "honig","mozzarella","parmesan","frischkaese","huettenkaese","schmand","molke","ghee",
-  "mascarpone","ricotta","feta","gouda","emmentaler","whey","casein","laktose","pecorino",
-  "cheddar","gruyere","sahnejoghurt","buttermilch","halloumi","grillkaese","burrata","pudding",
-];
-
-const PLANT_MILK = /hafermilch|mandelmilch|sojamilch|kokosmilch|reismilch|erbsenmilch|haferdrink|mandeldrink|sojadrink/g;
 
 export function normDiet(s){
   return String(s || "")
@@ -41,34 +33,28 @@ function hasWord(text, keys){
   return keys.some(key => tokens.some(t => tokenHits(t, key)));
 }
 
-/** "fleisch" | "vegetarisch" | "vegan" */
+/** "fleisch" oder "vegetarisch". Pflanzliche Rezepte zählen als vegetarisch. */
 export function detectDiet(lines){
-  const raw = (Array.isArray(lines) ? lines : []).map(normDiet).join(" ");
-  const text = raw.replace(PLANT_MILK, " ");
+  const text = (Array.isArray(lines) ? lines : []).map(normDiet).join(" ");
   if (hasWord(text, MEAT)) return "fleisch";
-  if (hasWord(text, DAIRY)) return "vegetarisch";
-  return "vegan";
+  return "vegetarisch";
 }
 
 export function dietOf(recipe, manual){
   const id = recipe && recipe.id;
   const m = manual && id ? manual[id] : "";
-  if (m === "vegan" || m === "vegetarisch" || m === "fleisch") return m;
+  if (m === "vegan" || m === "vegetarisch") return "vegetarisch";
+  if (m === "fleisch") return "fleisch";
   return detectDiet(recipe && recipe.z);
 }
 
 export function dietPasses(kind, filter){
   if (!filter || filter === "Alle") return true;
-  if (filter === "Vegan") return kind === "vegan";
-  if (filter === "Vegetarisch") return kind === "vegan" || kind === "vegetarisch";
+  if (filter === "Vegetarisch" || filter === "Vegan") return kind === "vegetarisch" || kind === "vegan";
   return true;
 }
 
-const LEAF = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19C5 11 12 5 20 4c-1 8-8 15-15 15z"/><path d="M8.5 16.5c2-2.2 4.2-5 6.5-8"/></svg>';
-const EGG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c3.2 0 5.5 4.2 5.5 8.2 0 4.2-2.4 8.8-5.5 8.8s-5.5-4.6-5.5-8.8C6.5 7.7 8.8 3.5 12 3.5z"/></svg>';
-
 export function dietMark(kind){
-  if (kind !== "vegan" && kind !== "vegetarisch") return "";
-  const label = kind === "vegan" ? "vegan" : "vegetarisch";
-  return `<span class="dietmark" title="${label}" aria-label="${label}">${kind === "vegan" ? LEAF : EGG}</span>`;
+  if (kind !== "vegetarisch" && kind !== "vegan") return "";
+  return `<span class="dietmark" title="vegetarisch" aria-label="vegetarisch">v</span>`;
 }

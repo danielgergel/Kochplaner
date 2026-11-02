@@ -105,7 +105,10 @@ export function letSleep(){
 
 function shownDiet(r){ return dietOf(r, ST.diet || {}); }
 export function nameHtml(r){ return esc(r.n) + dietMark(shownDiet(r)); }
-function dietOk(r){ return dietPasses(shownDiet(r), ui.fd || "Alle"); }
+function dietOk(r){
+  const f = ui.fd === "Vegan" ? "Vegetarisch" : (ui.fd || "Alle");
+  return dietPasses(shownDiet(r), f);
+}
 
 function row(r){
   const n = ST.sel[r.id] || 0;
@@ -125,8 +128,8 @@ export function listHtml(){
   return rows.map(row).join("");
 }
 export function recipesHtml(){
-  const diets = ["Alle","Vegetarisch","Vegan"];
-  return `<div class="tools"><input id="q" type="search" placeholder="Rezept suchen" value="${esc(ui.fq)}" aria-label="Rezept suchen"><div class="chips" id="chips">${GROUPS.map(g => `<button data-g="${g}" aria-pressed="${g === ui.fg}">${g}</button>`).join("")}</div><div class="chips" id="dietchips">${diets.map(g => `<button data-fd="${g}" aria-pressed="${g === (ui.fd || "Alle")}">${g}</button>`).join("")}</div></div><button class="btn" id="newrec" style="width:100%;margin-bottom:10px">Eigenes Rezept anlegen</button><div id="list">${listHtml()}</div>`;
+  const diets = [["Alle","Alle"],["Vegetarisch","v Vegetarisch"]];
+  return `<div class="tools"><input id="q" type="search" placeholder="Rezept suchen" value="${esc(ui.fq)}" aria-label="Rezept suchen"><div class="chips" id="chips">${GROUPS.map(g => `<button data-g="${g}" aria-pressed="${g === ui.fg}">${g}</button>`).join("")}</div><div class="chips" id="dietchips">${diets.map(([g, label]) => `<button data-fd="${g}" aria-pressed="${g === (ui.fd || "Alle")}">${label}</button>`).join("")}</div></div><button class="btn" id="newrec" style="width:100%;margin-bottom:10px">Eigenes Rezept anlegen</button><div id="list">${listHtml()}</div>`;
 }
 
 export function detailHtml(id){
@@ -288,7 +291,8 @@ export function openDice(){
 export function crHtml(id){
   const r = id ? catalog.all[id] : null;
   const g = r ? grp(r) : "Hauptmahlzeit";
-  const manual = id && ST.diet && ST.diet[id] || "";
+  const storedDiet = id && ST.diet && ST.diet[id] || "";
+  const manual = storedDiet === "vegan" ? "vegetarisch" : storedDiet;
   const baseNote = id && catalog.base && catalog.base[id]
     ? `<p class="note" style="margin-top:0">Deine Fassung ersetzt das Original in Plan und Einkauf. Die Nummer bleibt gleich. Mit „Original wiederherstellen“ kommt die eingebaute Fassung zurück.</p>`
     : `<p class="note" style="margin-top:0">Zutaten und Mengen gelten für 2 Personen, genau so wie du sie eintippst. Kalorien und Eiweiß pro Person.</p>`;
@@ -306,7 +310,7 @@ export function crHtml(id){
   <div class="frm">
    <label class="full">Name<input id="cr-n" value="${esc(r ? r.n : "")}" placeholder="z. B. Hähnchen-Reis-Pfanne"></label>
    <label class="full">Art<select id="cr-g">${Object.keys(CGRP).map(x => `<option${x === g ? " selected" : ""}>${x}</option>`).join("")}</select></label>
-   <label class="full">Ernährung<select id="cr-d"><option value=""${!manual ? " selected" : ""}>Automatisch erkennen</option><option value="vegan"${manual === "vegan" ? " selected" : ""}>Vegan</option><option value="vegetarisch"${manual === "vegetarisch" ? " selected" : ""}>Vegetarisch</option><option value="fleisch"${manual === "fleisch" ? " selected" : ""}>Mit Fleisch oder Fisch</option></select></label>
+   <label class="full">Ernährung<select id="cr-d"><option value=""${!manual ? " selected" : ""}>Automatisch erkennen</option><option value="vegetarisch"${manual === "vegetarisch" ? " selected" : ""}>Vegetarisch</option><option value="fleisch"${manual === "fleisch" ? " selected" : ""}>Mit Fleisch oder Fisch</option></select></label>
    <label>kcal pro Person<input id="cr-k" inputmode="numeric" value="${r ? r.k : ""}" placeholder="automatisch"></label>
    <label>Eiweiß (g)<input id="cr-p" inputmode="numeric" value="${r ? r.p : ""}" placeholder="automatisch"></label>
    <label class="full">Zeit<input id="cr-t" value="${esc(r ? r.t : "")}" placeholder="automatisch"></label>
@@ -365,8 +369,9 @@ export function saveCr(id){
     if (i >= 0) ST.cust[i] = rec; else ST.cust.push(rec);
   }
   if (!ST.diet || typeof ST.diet !== "object" || Array.isArray(ST.diet)) ST.diet = {};
-  const diet = ($("#cr-d") && $("#cr-d").value) || "";
-  if (diet === "vegan" || diet === "vegetarisch" || diet === "fleisch") ST.diet[rec.id] = diet;
+  let diet = ($("#cr-d") && $("#cr-d").value) || "";
+  if (diet === "vegan") diet = "vegetarisch";
+  if (diet === "vegetarisch" || diet === "fleisch") ST.diet[rec.id] = diet;
   else delete ST.diet[rec.id];
   rebuildAll();
   persist();

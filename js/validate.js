@@ -204,7 +204,7 @@ export function sanitizeAoffers(v){
     for (const [k, arr] of Object.entries(v.byItem)) {
       const key = str(k, 80);
       if (!key || !Array.isArray(arr)) continue;
-      o.byItem[key] = arr.map(sanitizeHit).filter(Boolean).slice(0, 5);
+      o.byItem[key] = arr.map(sanitizeHit).filter(Boolean).slice(0, 8);
       if (Object.keys(o.byItem).length >= 40) break;
     }
   }

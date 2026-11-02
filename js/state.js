@@ -95,6 +95,7 @@ export const ui = {
   foldOpen: {},
   fd: "Alle",
   noOfferOpen: false,
+  offerChains: {},
   awake: false,
   syncState: "off",
   dState: "off",

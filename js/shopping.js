@@ -203,7 +203,14 @@ export function bindShopping(){
     if (ev.target.id === "no-offers") return;
   });
   document.addEventListener("toggle", ev => {
-    if (ev.target && ev.target.id === "no-offers") ui.noOfferOpen = !!ev.target.open;
+    const t = ev.target;
+    if (!t) return;
+    if (t.id === "no-offers") ui.noOfferOpen = !!t.open;
+    if (t.dataset && t.dataset.chain) {
+      if (!ui.offerChains || typeof ui.offerChains !== "object") ui.offerChains = {};
+      if (t.open) ui.offerChains[t.dataset.chain] = 1;
+      else delete ui.offerChains[t.dataset.chain];
+    }
   }, true);
   setInterval(() => {
     if (ui.tab !== "E") return;
