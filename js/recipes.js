@@ -4,7 +4,8 @@ import { sc } from "./data/shop-rules.js";
 import { labelsOf, clearLabels, labelMap } from "./shopcalc.js";
 import { estimateRecipe } from "./nutrition.js";
 import { NSVIDEO } from "./data/wake.js";
-import { showPanel, closePanel, setDiceTimer, clearDiceTimer } from "./panels.js";
+import { showPanel, hidePanel, closePanel, setDiceTimer, clearDiceTimer } from "./panels.js";
+import { diceResult, setDiceResult, openFromPanel, takeBehind } from "./panel-return.js";
 import { parseRecipeText } from "./ocr-text.js";
 import { badgeOf, idNumber, recipeRank, clearSearchCache } from "./recipe-badge.js";
 
@@ -185,9 +186,10 @@ function openSub(id){
   pop.innerHTML = `<b>Statt ${esc(e.name)}</b><ul>${e.alts.map(a => `<li>${esc(a)}</li>`).join("")}</ul><button type="button" class="btn subx" data-subx>Schließen</button>`;
 }
 
-export function openRecipe(id){
+export function openRecipe(id, fromPanel){
   if (!catalog.all[id]) return;
   ui.openId = id;
+  if (openFromPanel(fromPanel)) hidePanel();
   const d = $("#det");
   d.innerHTML = detailHtml(id);
   d.hidden = false;
@@ -196,8 +198,13 @@ export function openRecipe(id){
 }
 export function closeRecipe(){
   ui.openId = null;
-  $("#det").hidden = true;
+  const det = $("#det");
+  if (det) det.hidden = true;
   letSleep();
+  const back = takeBehind();
+  if (back === "D") { openDice(); return; }
+  if (back === "F") { openFridge(); return; }
+  if (back === "Y") { ui.openDy({ keep:true }); return; }
   ui.render();
 }
 export function redrawDetail(){
@@ -280,26 +287,40 @@ function dpool(){
 }
 function dshow(r, fin){
   const n = ST.sel[r.id] || 0;
-  $("#dres").innerHTML = `<div class="dice-card"><span class="id">${esc(badgeOf(r.id, ST.cust))}</span><b>${nameHtml(r)}</b><span class="meta">${metaOf(r)}</span></div>` +
+  const box = $("#dres");
+  if (!box) return;
+  box.innerHTML = `<div class="dice-card"><span class="id">${esc(badgeOf(r.id, ST.cust))}</span><b>${nameHtml(r)}</b><span class="meta">${metaOf(r)}</span></div>` +
     (fin ? `<div class="dice-acts"><button class="btn pri" data-do="${r.id}">Rezept ansehen</button><button class="btn" data-da="${r.id}">${n ? "Im Plan ✓" : "Zum Plan"}</button></div>` : "");
+}
+function showDiceResult(){
+  const id = diceResult();
+  const r = id && catalog.all[id];
+  if (r) dshow(r, true);
+  else if (id) setDiceResult(null);
 }
 function roll(){
   const p = dpool(), out = $("#dres");
   clearDiceTimer();
-  if (!p.length) { out.innerHTML = '<p class="empty">Dazu gibt es nichts. Nimm eine andere Art oder wähle mehr Zutaten im Kühlschrank.</p>'; return; }
+  if (!p.length) {
+    setDiceResult(null);
+    if (out) out.innerHTML = '<p class="empty">Dazu gibt es nichts. Nimm eine andere Art oder wähle mehr Zutaten im Kühlschrank.</p>';
+    return;
+  }
   const fin = p[Math.floor(Math.random() * p.length)];
+  const finish = () => { setDiceResult(fin.id); dshow(fin, true); };
   const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (reduce || p.length === 1) { dshow(fin, true); return; }
+  if (reduce || p.length === 1) { finish(); return; }
   let n = 0;
   setDiceTimer(setInterval(() => {
     n++;
-    if (n >= 12) { clearDiceTimer(); dshow(fin, true); }
+    if (n >= 12) { clearDiceTimer(); finish(); }
     else dshow(p[Math.floor(Math.random() * p.length)], false);
   }, 80));
 }
 export function openDice(){
   ui.pm = "D";
   showPanel(diceHtml());
+  showDiceResult();
 }
 
 export function crHtml(id){
@@ -487,7 +508,7 @@ export function bindRecipeDom(){
       return;
     }
     if (d.fclr !== undefined) { ST.fr = {}; persist(); refreshFridge(); return; }
-    if (d.fo) { closePanel(); openRecipe(d.fo); return; }
+    if (d.fo) { openRecipe(d.fo, "F"); return; }
     if (d.fa) {
       if (ST.sel[d.fa]) delete ST.sel[d.fa]; else ST.sel[d.fa] = 1;
       persist();
@@ -501,7 +522,7 @@ export function bindRecipeDom(){
     if (d.dg) { ui.dg = d.dg; document.querySelectorAll("#dchips [data-dg]").forEach(b => b.setAttribute("aria-pressed", b.dataset.dg === ui.dg)); return; }
     if (d.dfr !== undefined) { ui.dfr = !ui.dfr; t.setAttribute("aria-pressed", ui.dfr); return; }
     if (t.id === "droll") { roll(); return; }
-    if (d.do) { closePanel(); openRecipe(d.do); return; }
+    if (d.do) { openRecipe(d.do, "D"); return; }
     if (d.da) {
       if (ST.sel[d.da]) delete ST.sel[d.da]; else ST.sel[d.da] = 1;
       persist();

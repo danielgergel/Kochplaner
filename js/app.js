@@ -6,7 +6,7 @@ import { rebuildAll, cleanIds, recipesHtml, listHtml, openRecipe, closeRecipe, r
 import { planHtml, bindPlan } from "./plan.js";
 import { shopHtml, badges, bindShopping, reconcileHidden, dropHidden } from "./shopping.js";
 import { maybeRefreshOffers } from "./offers.js";
-import { drawDy, bindDiary } from "./diary.js";
+import { drawDy, openDy, bindDiary } from "./diary.js";
 import { closeScan, bindScanner, warmupScanner } from "./scanner.js";
 import { bindOcr } from "./ocr.js";
 import { closePanel } from "./panels.js";
@@ -36,6 +36,7 @@ ui.openHh = openHh;
 ui.closePanel = closePanel;
 ui.openRecipe = openRecipe;
 ui.closeRecipe = closeRecipe;
+ui.openDy = openDy;
 ui.dyk = dkey(new Date());
 
 const CLRSEL = "#q,#dyq,#qk,#fsr,#wkq,#hh-c,#dc-c";

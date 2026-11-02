@@ -112,6 +112,7 @@ export const ui = {
   openHh(){},
   closeRecipe(){},
   closePanel(){},
+  openDy(){},
 };
 
 let wt = null;
