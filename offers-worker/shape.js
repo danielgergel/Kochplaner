@@ -107,6 +107,7 @@ export function splitNote(text){
     note = price ? "Mit Edeka-App " + price + " €" : "Mit Edeka-App";
     name = src.replace(m[0], " ");
   }
+  name = name.replace(/\bthisisnobrand123\b/ig, " ");
   name = name.replace(/(\d+(?:,\d+)?\s*%\s*Fett)\s+\1/gi, "$1").replace(/\s+/g, " ").trim();
   return { name, note };
 }

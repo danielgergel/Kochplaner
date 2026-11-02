@@ -3,8 +3,14 @@ import assert from "node:assert/strict";
 import { detectDiet, dietOf, dietPasses, dietMark } from "../js/diet.js";
 import { SUBS, substituteFor } from "../js/data/subs.js";
 import { partitionOffers, noOfferLabel, chainOf, chainLabel, groupOffersByChain } from "../js/offers.js";
-import { expireChecked, CHECK_MS } from "../js/shopping.js";
+import { expireChecked, CHECK_MS, planStamp, reconcileHidden, dropHidden } from "../js/shopping.js";
 import { mergeRecipe } from "../js/recipes.js";
+import { ST } from "../js/state.js";
+import { sanitizeState } from "../js/validate.js";
+import { offerMatches } from "../js/offer-match.js";
+import { shapeOffer } from "../offers-worker/shape.js";
+import worker, { jsonResponse } from "../offers-worker/worker.js";
+import { loadBuiltinRecipes } from "../js/data/recipes.js";
 
 test("Ernährung folgt den Zutaten, die manuelle Wahl gewinnt", () => {
   assert.equal(detectDiet(["150 g Hähnchenbrust", "100 g Reis"]), "fleisch");
@@ -25,6 +31,10 @@ test("Ernährung folgt den Zutaten, die manuelle Wahl gewinnt", () => {
   assert.doesNotMatch(mark, /<svg/);
   assert.equal(dietMark("vegan").includes(">v<"), true);
   assert.equal(dietMark("fleisch"), "");
+  assert.equal(detectDiet(["½ Beutel Curry (ohne Hähnchen)", "100 ml Kokosmilch"]), "vegetarisch");
+  assert.equal(detectDiet(["1 EL Currypaste (ohne Garnelen)"]), "vegetarisch");
+  assert.equal(detectDiet(["150 g Hähnchenbrust"]), "fleisch");
+  assert.equal(detectDiet(loadBuiltinRecipes().E11.z), "vegetarisch");
 });
 
 test("Ersatzliste kennt Kreuzkümmel und bleibt bei Pflanzenmilch", () => {
@@ -89,6 +99,85 @@ test("Angebote stehen je Ladenkette zusammen, Filialen zählen als eine Kette", 
   assert.deepEqual(g.rest, ["Öl"]);
   assert.equal(chainLabel("Lidl", 3, 4), "Lidl (3 von 4)");
   assert.equal(g.total, 4);
+});
+
+test("ausgeblendete Artikel gelten nur für den aktuellen Plan", () => {
+  const key = "Fleisch & Wurst|Hähnchenbrust|g";
+  ST.sel = { M1: 1 };
+  ST.sx = { [key]: 1 };
+  ST.sxPlan = "";
+  reconcileHidden();
+  assert.deepEqual(ST.sx, {});
+  assert.equal(ST.sxPlan, "");
+
+  ST.sx = { [key]: 1 };
+  ST.sxPlan = planStamp(ST.sel);
+  reconcileHidden();
+  assert.equal(ST.sx[key], 1);
+
+  ST.sel = { F1: 1 };
+  reconcileHidden();
+  assert.equal(ST.sx[key], undefined);
+
+  ST.sel = { M1: 1 };
+  ST.sx = { [key]: 1 };
+  ST.sxPlan = planStamp(ST.sel);
+  dropHidden();
+  assert.deepEqual(ST.sx, {});
+  ST.sel = {};
+  ST.sxPlan = "";
+
+  const old = sanitizeState({
+    sel: { M1: 1 },
+    sx: { [key]: 1 },
+  });
+  assert.deepEqual(old.sx, {});
+  assert.equal(old.sxPlan, "");
+  const kept = sanitizeState({
+    sel: { M1: 1 },
+    sx: { [key]: 1 },
+    sxPlan: "M1:1",
+  });
+  assert.equal(kept.sx[key], 1);
+  assert.equal(kept.sxPlan, "M1:1");
+});
+
+test("OPTIONS ist 204 ohne Body, POST bleibt erreichbar", async () => {
+  const opt = jsonResponse(null, 204, "https://danielgergel.github.io");
+  assert.equal(opt.status, 204);
+  assert.equal(await opt.text(), "");
+  assert.equal(opt.headers.get("access-control-allow-origin"), "https://danielgergel.github.io");
+  assert.match(opt.headers.get("access-control-allow-methods"), /POST/);
+  assert.match(opt.headers.get("access-control-allow-methods"), /OPTIONS/);
+  const live = await worker.fetch(new Request("https://kochplaner-angebote.example/offers", {
+    method: "OPTIONS",
+    headers: { Origin: "http://127.0.0.1:8765" },
+  }));
+  assert.equal(live.status, 204);
+  assert.equal(live.headers.get("access-control-allow-origin"), "http://127.0.0.1:8765");
+  const post = await worker.fetch(new Request("https://kochplaner-angebote.example/offers", {
+    method: "POST",
+    headers: { Origin: "http://localhost:8080", "content-type": "application/json" },
+    body: "{",
+  }));
+  assert.equal(post.status, 400);
+  const data = await post.json();
+  assert.equal(data.ok, false);
+  assert.equal(post.headers.get("access-control-allow-origin"), "http://localhost:8080");
+});
+
+test("Platzhaltermarke und eindeutig falsche Treffer fallen weg", () => {
+  const row = shapeOffer({
+    price: 1.11,
+    product: { name: "Bananen 1 kg" },
+    brand: { name: "thisisnobrand123" },
+    description: "Costa Rica",
+  }, "Bananen", "Lidl", "76133");
+  assert.doesNotMatch(row.name, /thisisnobrand123/i);
+  assert.match(row.name, /Bananen/);
+  assert.equal(offerMatches("Bananen", "Bananen Duschgel"), false);
+  assert.equal(offerMatches("Bananen", "Chiquita Bananen 1 kg"), true);
+  assert.equal(offerMatches("Spülmittel", "Spülmittel 1 l"), true);
 });
 
 test("eine geänderte Fassung behält die Rezeptnummer", () => {

@@ -5,6 +5,29 @@ import { offersHtml, refreshOffers } from "./offers.js";
 
 export const CHECK_MS = 30 * 60 * 1000;
 
+export function planStamp(sel){
+  if (!sel || typeof sel !== "object") return "";
+  return Object.keys(sel).sort().map(id => id + ":" + sel[id]).join(",");
+}
+
+export function reconcileHidden(){
+  ensureMaps();
+  if (typeof ST.sxPlan !== "string") ST.sxPlan = "";
+  const stamp = planStamp(ST.sel);
+  if (!ST.sxPlan || ST.sxPlan !== stamp) {
+    const dirty = Object.keys(ST.sx).length > 0 || !!ST.sxPlan;
+    ST.sx = {};
+    ST.sxPlan = "";
+    if (dirty) persist();
+  }
+}
+
+export function dropHidden(){
+  ensureMaps();
+  ST.sx = {};
+  ST.sxPlan = "";
+}
+
 export function expireChecked(sc, extra, sx, now, ms){
   const nextSc = Object.assign({}, sc || {});
   const nextSx = Object.assign({}, sx || {});
@@ -38,11 +61,15 @@ export function applyExpire(now){
   ST.sc = r.sc;
   ST.extra = r.extra;
   ST.sx = r.sx;
+  if (Object.keys(ST.sx).length) ST.sxPlan = planStamp(ST.sel);
   persist();
   return true;
 }
 
-function hidden(key){ return !!(ST.sx && ST.sx[key]); }
+function hidden(key){
+  if (!ST.sxPlan || ST.sxPlan !== planStamp(ST.sel)) return false;
+  return !!(ST.sx && ST.sx[key]);
+}
 
 function checkedN(){
   ensureMaps();
@@ -133,21 +160,25 @@ function clearDone(){
   const snap = {
     sc: JSON.parse(JSON.stringify(ST.sc)),
     sx: JSON.parse(JSON.stringify(ST.sx)),
+    sxPlan: ST.sxPlan || "",
     extra: JSON.parse(JSON.stringify(ST.extra)),
   };
   Object.keys(ST.sc).forEach(k => { if (ST.sc[k]) { ST.sx[k] = 1; delete ST.sc[k]; } });
+  ST.sxPlan = Object.keys(ST.sx).length ? planStamp(ST.sel) : "";
   ST.extra = exList().filter(x => !x.d);
   persist();
   const y = window.scrollY; ui.render(); window.scrollTo(0, y);
   toast(n === 1 ? "1 Artikel entfernt" : n + " Artikel entfernt", { label:"Rückgängig", run(){
     ST.sc = snap.sc;
     ST.sx = snap.sx;
+    ST.sxPlan = snap.sxPlan || "";
     ST.extra = snap.extra;
     persist();
     const y2 = window.scrollY; ui.render(); window.scrollTo(0, y2);
   } });
 }
 export function shopHtml(){
+  reconcileHidden();
   applyExpire(Date.now());
   return exHtml() + shopCore() + doneBar() + offersHtml() + manualHtml();
 }

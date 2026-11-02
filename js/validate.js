@@ -271,6 +271,7 @@ export function sanitizeField(k, v){
     case "sc": return sanitizeChecks(v);
     case "sx":
     case "fr": return flagMap(v);
+    case "sxPlan": return typeof v === "string" && /^[A-Za-z0-9_:,.-]{0,800}$/.test(v) ? v : "";
     case "done": return flagMapId(v);
     case "cust": return sanitizeCust(v);
     case "offers": return sanitizeOffers(v);
@@ -364,10 +365,15 @@ export function sanitizeRc(v){
 export function sanitizeState(raw){
   const src = isObj(raw) ? raw : {};
   const out = { v:1, u: asNumber(src.u) || 0, sel:{}, sc:{}, rc: sanitizeRc(src.rc) };
-  for (const k of ["sel","sc","fr","cust","done","offers","week","rate","aoffers","plz","stores","wish","extra","offerUrl","ov","diet","sx"]) {
-    const empty = (k === "plz" || k === "offerUrl") ? "" : (k === "cust" || k === "offers" || k === "stores" || k === "wish" || k === "extra" ? [] : {});
+  for (const k of ["sel","sc","fr","cust","done","offers","week","rate","aoffers","plz","stores","wish","extra","offerUrl","ov","diet","sx","sxPlan"]) {
+    const empty = (k === "plz" || k === "offerUrl" || k === "sxPlan") ? "" : (k === "cust" || k === "offers" || k === "stores" || k === "wish" || k === "extra" ? [] : {});
     const c = src[k] === undefined ? empty : sanitizeField(k, src[k]);
     out[k] = c === undefined ? empty : c;
+  }
+  const stamp = Object.keys(out.sel || {}).sort().map(id => id + ":" + out.sel[id]).join(",");
+  if (!out.sxPlan || out.sxPlan !== stamp) {
+    out.sx = {};
+    out.sxPlan = "";
   }
   if (!out.u) out.u = Date.now();
   return out;
