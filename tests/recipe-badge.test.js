@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { badgeOf, haystack, idNumber } from "../js/recipe-badge.js";
+import { badgeOf, haystack, idNumber, recipeRank, clearSearchCache, stemSearch } from "../js/recipe-badge.js";
+import { loadBuiltinRecipes } from "../js/data/recipes.js";
 
 const cust = [
   { id: "X1761200000002", n: "Skyr mit Beeren" },
@@ -25,6 +26,34 @@ test("Suche findet Name, kurze Nummer und die lange gespeicherte id", () => {
   assert.equal(haystack(r, cust).includes("x1761200000001"), true);
   assert.equal(haystack(r, cust).includes("xyz"), false);
   assert.equal(haystack({ id: "F4", n: "Porridge" }, cust).includes("f4"), true);
+});
+
+test("Suche: mehrere Wörter, Zutaten, Stamm und Synonyme", () => {
+  const e6 = loadBuiltinRecipes().E6;
+  assert.equal(e6.n, "Nudel-Schafskäse aus dem Airfryer");
+  assert.equal(recipeRank(e6, "nudeln feta", []), 0);
+  assert.equal(recipeRank(e6, "feta nudeln", []), 0);
+  assert.equal(recipeRank(e6, "spaghetti schafskaese", []), 0);
+  assert.equal(stemSearch("nudeln"), "nudel");
+  assert.equal(stemSearch("tomaten"), "tomat");
+  assert.equal(stemSearch("tomate"), "tomat");
+  const nameHit = { id: "T1", n: "Tomaten-Salat", z: ["Gurke"] };
+  const ingHit = { id: "T2", n: "Sommerbowl", z: ["200 g Tomaten"] };
+  assert.equal(recipeRank(nameHit, "tomaten", []), 0);
+  assert.equal(recipeRank(ingHit, "tomate", []), 1);
+  const custom = { id: "X1", n: "Ofenschale", z: ["150 g Feta"] };
+  assert.equal(recipeRank(custom, "schafskäse", []), 1);
+  assert.equal(recipeRank({ id: "T4", n: "Hähnchenpfanne", z: [] }, "huhn", []), 0);
+  assert.equal(recipeRank({ id: "T6", n: "Pfanne", z: ["Hackfleisch"] }, "hack", []), 1);
+  const cached = { id: "T5", n: "Bowl", z: ["Feta"] };
+  assert.equal(recipeRank(cached, "feta", []), 1);
+  cached.z = ["Reis"];
+  assert.equal(recipeRank(cached, "feta", []), 1);
+  clearSearchCache();
+  assert.equal(recipeRank(cached, "feta", []), -1);
+  assert.equal(recipeRank(cached, "reis", []), 1);
+  assert.match(haystack(e6, []), /schafskäse/);
+  assert.match(haystack(e6, []), /nudeln/);
 });
 
 test("Zeitstempel in der id bleiben in Erstellreihenfolge sortierbar", () => {
