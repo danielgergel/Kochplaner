@@ -53,6 +53,10 @@ if (!ST.ov || typeof ST.ov !== "object" || Array.isArray(ST.ov)) ST.ov = {};
 if (!ST.diet || typeof ST.diet !== "object" || Array.isArray(ST.diet)) ST.diet = {};
 if (!ST.sx || typeof ST.sx !== "object" || Array.isArray(ST.sx)) ST.sx = {};
 if (typeof ST.sxPlan !== "string") ST.sxPlan = "";
+if (typeof ST.nick !== "string") ST.nick = "";
+if (typeof ST.shareToken !== "string") ST.shareToken = "";
+if (!ST.share || typeof ST.share !== "object" || Array.isArray(ST.share)) ST.share = {};
+if (!ST.imports || typeof ST.imports !== "object" || Array.isArray(ST.imports)) ST.imports = {};
 
 export const DY = { goal:{ k:2100, p:150 }, days:{}, foods:[] };
 {

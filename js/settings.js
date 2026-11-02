@@ -5,8 +5,9 @@ import { newCode, setHousehold, leaveHousehold, useLocalOnly, hhUrl, diaryCode, 
 import { exportBackup, parseBackup, applyBackup, summaryOf } from "./backup.js";
 import { rebuildAll } from "./recipes.js";
 import { readTheme, saveTheme } from "./theme.js";
+import { claimUsername } from "./share.js";
 
-const APPV = "02.11.2026, Stand 25";
+const APPV = "02.11.2026, Stand 26";
 const ALLSTORES = ["REWE","Lidl","Penny","Aldi","Edeka","Kaufland","Netto"];
 let pending = null;
 
@@ -15,6 +16,15 @@ function themeHtml(){
   const opts = [["auto", "Wie Handy"], ["light", "Hell"], ["dark", "Dunkel"]];
   const buttons = opts.map(([id, label]) => `<button type="button" role="tab" data-theme-set="${id}" aria-selected="${cur === id}">${label}</button>`).join("");
   return `<h3 class="sec" style="margin-top:4px">Darstellung</h3><div class="seg" id="theme-seg" role="tablist" aria-label="Darstellung">${buttons}</div>`;
+}
+function nickHtml(){
+  const cur = ST.nick
+    ? `Dein Name ist <b>${esc(ST.nick)}</b>. Wer ihn kennt, sieht die Rezepte, bei denen Teilen an ist.`
+    : "Noch kein Benutzername. Damit können Freunde deine geteilten Rezepte finden.";
+  return `<h3 class="sec">Benutzername</h3>
+  <p class="note" style="margin-top:0">${cur} Kleinbuchstaben, Ziffern und Unterstrich, 3 bis 20 Zeichen.</p>
+  <div class="frm"><label class="full">Name<input id="st-nick" autocapitalize="none" autocomplete="off" maxlength="20" value="${esc(ST.nick || "")}" placeholder="z. B. anna_kocht"></label></div>
+  <div class="stack"><button class="btn pri" data-nick>Namen speichern</button></div>`;
 }
 function setHtml(){
   const st = ST.stores || [];
@@ -61,6 +71,7 @@ export function hhHtml(){
    <div class="stack"><button class="btn" data-hhjoin>Beitreten</button><button class="btn" data-hhlocal>Nur auf diesem Handy nutzen</button></div>`;
   return `<div class="dtop"><div class="in"><button class="back" data-pc>${HH ? "Schließen" : "Später"}</button></div></div>
   <div class="dbody"><h2>Einstellungen</h2>${themeHtml()}<h3 class="sec">Haushalt und Teilen</h3>${household}
+  ${nickHtml()}
   ${setHtml()}
   ${dcHtml()}
   <h3 class="sec">Datenquellen</h3><p class="note" style="margin-top:0">Gescannte Produkte: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL). Die Werte beim Schnell-Eintragen sind Durchschnittswerte und können abweichen. Angebote kommen über den eigenen Dienst von marktguru, inoffiziell, und können ausfallen.</p>
@@ -154,6 +165,7 @@ export function bindSettings(){
       t.setAttribute("aria-pressed", String(i < 0));
       return;
     }
+    if (d.nick !== undefined) { claimUsername(($("#st-nick") || { value:"" }).value); return; }
     if (d.bkexp !== undefined) { exportBackup(); return; }
     if (d.bkno !== undefined) { pending = null; openHh(); return; }
     if (d.bkok !== undefined && pending) {

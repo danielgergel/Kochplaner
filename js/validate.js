@@ -54,6 +54,8 @@ export function sanitizeRecipe(r){
   };
   const note = str(r.note, 600); if (note) out.note = note;
   const q = str(r.q, 160); if (q) out.q = q;
+  if (typeof r.from === "string" && /^[a-z0-9_]{3,20}$/.test(r.from)) out.from = r.from;
+  if (typeof r.src === "string" && ID_RE.test(r.src)) out.src = r.src;
   const u = str(r.u, 120); if (u) out.u = u;
   const mp = str(r.mp, 160); if (mp) out.mp = mp;
   const w = asNumber(r.w);
@@ -251,6 +253,18 @@ export function sanitizeOv(v){
   return o;
 }
 
+export function sanitizeImports(v){
+  if (!isObj(v)) return undefined;
+  const o = {};
+  for (const [k, val] of Object.entries(v)) {
+    const m = /^([a-z0-9_]{3,20})\/([A-Za-z][A-Za-z0-9_-]{0,40})$/.exec(String(k));
+    if (!m || typeof val !== "string" || !ID_RE.test(val)) continue;
+    o[m[1] + "/" + m[2]] = val;
+    if (Object.keys(o).length >= 300) break;
+  }
+  return o;
+}
+
 export function sanitizeCust(v){
   if (!Array.isArray(v)) return undefined;
   const out = [];
@@ -272,6 +286,10 @@ export function sanitizeField(k, v){
     case "sx":
     case "fr": return flagMap(v);
     case "sxPlan": return typeof v === "string" && /^[A-Za-z0-9_:,.-]{0,800}$/.test(v) ? v : "";
+    case "nick": return typeof v === "string" && (v === "" || /^[a-z0-9_]{3,20}$/.test(v)) ? v : "";
+    case "shareToken": return typeof v === "string" && (v === "" || /^[a-z0-9]{32}$/.test(v)) ? v : "";
+    case "share": return flagMapId(v);
+    case "imports": return sanitizeImports(v);
     case "done": return flagMapId(v);
     case "cust": return sanitizeCust(v);
     case "offers": return sanitizeOffers(v);
@@ -365,8 +383,8 @@ export function sanitizeRc(v){
 export function sanitizeState(raw){
   const src = isObj(raw) ? raw : {};
   const out = { v:1, u: asNumber(src.u) || 0, sel:{}, sc:{}, rc: sanitizeRc(src.rc) };
-  for (const k of ["sel","sc","fr","cust","done","offers","week","rate","aoffers","plz","stores","wish","extra","offerUrl","ov","diet","sx","sxPlan"]) {
-    const empty = (k === "plz" || k === "offerUrl" || k === "sxPlan") ? "" : (k === "cust" || k === "offers" || k === "stores" || k === "wish" || k === "extra" ? [] : {});
+  for (const k of ["sel","sc","fr","cust","done","offers","week","rate","aoffers","plz","stores","wish","extra","offerUrl","ov","diet","sx","sxPlan","nick","shareToken","share","imports"]) {
+    const empty = (k === "plz" || k === "offerUrl" || k === "sxPlan" || k === "nick" || k === "shareToken") ? "" : (k === "cust" || k === "offers" || k === "stores" || k === "wish" || k === "extra" ? [] : {});
     const c = src[k] === undefined ? empty : sanitizeField(k, src[k]);
     out[k] = c === undefined ? empty : c;
   }

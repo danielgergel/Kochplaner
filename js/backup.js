@@ -82,6 +82,10 @@ export function applyBackup(data){
   if (typeof ST.plz !== "string") ST.plz = "";
   if (typeof ST.offerUrl !== "string") ST.offerUrl = "";
   if (typeof ST.sxPlan !== "string") ST.sxPlan = "";
+  if (typeof ST.nick !== "string") ST.nick = "";
+  if (typeof ST.shareToken !== "string") ST.shareToken = "";
+  if (!ST.share || typeof ST.share !== "object" || Array.isArray(ST.share)) ST.share = {};
+  if (!ST.imports || typeof ST.imports !== "object" || Array.isArray(ST.imports)) ST.imports = {};
   rebuildAll();
   const diary = data.diary || sanitizeDiary(null);
   diary.u = Date.now();
