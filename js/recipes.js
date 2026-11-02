@@ -6,7 +6,7 @@ import { estimateRecipe } from "./nutrition.js";
 import { NSVIDEO } from "./data/wake.js";
 import { showPanel, closePanel, setDiceTimer, clearDiceTimer } from "./panels.js";
 import { parseRecipeText } from "./ocr-text.js";
-import { badgeOf, haystack, idNumber } from "./recipe-badge.js";
+import { badgeOf, idNumber, recipeRank, clearSearchCache } from "./recipe-badge.js";
 
 let shareHook = () => {};
 export function setShareHook(fn){ shareHook = fn; }
@@ -39,6 +39,7 @@ export function mergeRecipe(base, ov){
 }
 
 export function rebuildAll(){
+  clearSearchCache();
   if (!catalog.base) {
     const seed = {};
     for (const [id, r] of Object.entries(catalog.all || {})) if (id && id[0] !== "X") seed[id] = r;
@@ -117,22 +118,28 @@ function row(r){
   const n = ST.sel[r.id] || 0;
   return `<div class="rc"><button class="rb" data-open="${r.id}"><span class="top"><span class="id">${esc(badgeOf(r.id, ST.cust))}</span><b>${nameHtml(r)}</b></span><span class="meta">${metaOf(r)}</span></button><button class="add" data-add="${r.id}" aria-pressed="${n > 0}" aria-label="${n > 0 ? "Aus Plan nehmen" : "Zum Plan hinzufügen"}">${n > 0 ? (n > 1 ? n + "×" : "✓") : "+"}</button></div>`;
 }
+function bySearch(rows, q){
+  const ranked = rows.filter(r => recipeRank(r, q, ST.cust) >= 0);
+  if (!q.trim()) return ranked;
+  return ranked.sort((a, b) => recipeRank(a, q, ST.cust) - recipeRank(b, q, ST.cust));
+}
+
 export function listHtml(){
-  const q = ui.fq.trim().toLowerCase();
+  const q = ui.fq.trim();
   let rows;
   if (ui.fg === FAVG) {
-    rows = catalog.ALL.filter(r => starsOf(r.id) > 0 && dietOk(r) && (!q || haystack(r, ST.cust).includes(q)))
-      .sort((a, b) => starsOf(b.id) - starsOf(a.id) || a.n.localeCompare(b.n, "de"));
+    rows = bySearch(catalog.ALL.filter(r => starsOf(r.id) > 0 && dietOk(r)), q)
+      .sort((a, b) => recipeRank(a, q, ST.cust) - recipeRank(b, q, ST.cust) || starsOf(b.id) - starsOf(a.id) || a.n.localeCompare(b.n, "de"));
     if (!rows.length) return '<p class="empty">Noch keine Favoriten. Öffne ein Rezept und gib ihm 1 bis 3 Sterne.</p>';
   } else {
-    rows = catalog.ALL.filter(r => (ui.fg === "Alle" || grp(r) === ui.fg) && dietOk(r) && (!q || haystack(r, ST.cust).includes(q)));
+    rows = bySearch(catalog.ALL.filter(r => (ui.fg === "Alle" || grp(r) === ui.fg) && dietOk(r)), q);
     if (!rows.length) return '<p class="empty">Kein Rezept in dieser Auswahl.</p>';
   }
   return rows.map(row).join("");
 }
 export function recipesHtml(){
   const diets = [["Alle","Alle"],["Vegetarisch","v Vegetarisch"]];
-  return `<div class="tools"><input id="q" type="search" placeholder="Rezept suchen" value="${esc(ui.fq)}" aria-label="Rezept suchen"><div class="chips" id="chips">${GROUPS.map(g => `<button data-g="${g}" aria-pressed="${g === ui.fg}">${g}</button>`).join("")}</div><div class="chips" id="dietchips">${diets.map(([g, label]) => `<button data-fd="${g}" aria-pressed="${g === (ui.fd || "Alle")}">${label}</button>`).join("")}</div></div><div class="drow" style="margin-top:0"><button class="btn" id="friends" style="flex:1">Freunde</button><button class="btn" id="newrec" style="flex:1">Eigenes Rezept</button></div><div id="list">${listHtml()}</div>`;
+  return `<div class="tools"><input id="q" type="search" placeholder="Rezept oder Zutat suchen" value="${esc(ui.fq)}" aria-label="Rezept oder Zutat suchen"><div class="chips" id="chips">${GROUPS.map(g => `<button data-g="${g}" aria-pressed="${g === ui.fg}">${g}</button>`).join("")}</div><div class="chips" id="dietchips">${diets.map(([g, label]) => `<button data-fd="${g}" aria-pressed="${g === (ui.fd || "Alle")}">${label}</button>`).join("")}</div></div><div class="drow" style="margin-top:0"><button class="btn" id="friends" style="flex:1">Freunde</button><button class="btn" id="newrec" style="flex:1">Eigenes Rezept</button></div><div id="list">${listHtml()}</div>`;
 }
 
 export function detailHtml(id){
