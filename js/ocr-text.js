@@ -1,5 +1,7 @@
 /* Nachbearbeitung für die Texterkennung: Einheiten glätten und unleserliche Zeilen verwerfen. */
-const UNITS = new Set("el tl g kg mg ml l stk stück stueck tk pk nb cm msp cl dl prise prisen bund dose scheibe scheiben zehe zehen".split(" "));
+const UNITS = new Set("el tl g kg mg ml l stk stück stueck tk pk pck packung paket msp messerspitze nb cm cl dl prise prisen bund dose dosen scheibe scheiben zehe zehen".split(" "));
+const SMALL_UNIT = "(?:tl|el|prise|prisen|msp|messerspitze|pck|pk)";
+const BARE = new Set("salz pfeffer öl ol olivenöl rapsoel rapsöl wasser zucker essig senf butter paprika paprikapulver knoblauch knoblauchpulver zwiebelpulver curry currypulver zimt muskat oregano thymian rosmarin basilikum petersilie schnittlauch dill kuemmel kümmel kreuzkuemmel kreuzkümmel chili chiliflocken chilipulver lorbeer vanille honig bruehe brühe backpulver natron hefe".split(" "));
 const ROWS = ["qwertzuiopü", "asdfghjklöä", "yxcvbnm"];
 
 export function isKeySmash(word){
@@ -41,14 +43,38 @@ export function suspiciousToken(raw){
   return false;
 }
 
+function bareIngredient(line){
+  const t = String(line || "").toLowerCase().replace(/ß/g, "ss").replace(/[.,;:]/g, " ").replace(/\s+/g, " ").trim();
+  if (!t) return false;
+  if (BARE.has(t)) return true;
+  const parts = t.split(/\s+und\s+|\s+/).filter(p => p && p !== "und");
+  if (parts.length && parts.length <= 4 && parts.every(p => BARE.has(p))) return true;
+  if (/\b(nach geschmack|n\.?\s*b\.)\b/.test(t) && t.length < 80 && /[a-zäöü]{3,}/.test(t)) return true;
+  return false;
+}
+
 export function looksLikeIngredient(line){
+  if (bareIngredient(line)) return true;
   return /^(\d|½|¼|¾)/.test(line)
-    || /^(ein|eine|einen|etwas|je|prise|n\.?\s*b\.|nach geschmack)\b/i.test(line)
-    || /\b(\d+\s*)?(el|tl|stück|stk|prise|bund|dose|scheibe|zehe)\b/i.test(line);
+    || /^(ein|eine|einen|etwas|je|prise|n\.?\s*b\.|nach geschmack)\b\s+\S/i.test(line)
+    || /\b(\d+[.,]?\d*\s*)?(el|tl|stück|stk|prise|msp|messerspitze|bund|dose|pck|pk|packung|scheibe|zehe|zehen)\b/i.test(line);
+}
+
+function fracToComma(num, den){
+  const n = Number(num), d = Number(den);
+  if (![2, 3, 4, 5, 8].includes(d) || n <= 0 || n > 20) return null;
+  const v = Math.round((n / d) * 100) / 100;
+  return String(v).replace(".", ",");
 }
 
 export function normalizeAmount(s){
-  let t = String(s).replace(/[|¦]/g, " ").replace(/[“”„"'`´]/g, "").replace(/\s+/g, " ").trim();
+  let t = String(s).replace(/[“”„"'`´]/g, "").replace(/\s+/g, " ").trim();
+  t = t.replace(/½/g, "1/2").replace(/¼/g, "1/4").replace(/¾/g, "3/4").replace(/⅓/g, "1/3").replace(/⅔/g, "2/3");
+  t = t.replace(new RegExp("\\b(?:112|[Vv]2|[lI|]\\s*/\\s*2)\\b(?=\\s*" + SMALL_UNIT + "\\b)", "gi"), "1/2");
+  t = t.replace(new RegExp("\\b11\\s*/\\s*2\\b(?=\\s*" + SMALL_UNIT + "\\b)", "gi"), "1 1/2");
+  t = t.replace(/\b(\d+)\s+(\d+)\s*\/\s*(\d+)\b/g, (all, a, b, c) => fracToComma(Number(a) * Number(c) + Number(b), c) || all);
+  t = t.replace(/\b(\d+)\s*\/\s*(\d+)\b/g, (all, a, b) => fracToComma(a, b) || all);
+  t = t.replace(/[|¦]/g, " ");
   t = t.replace(/^[lI|]\s+(?=(?:EL|TL|g|kg|ml|Liter|Gramm)\b)/i, "1 ");
   t = t.replace(/\b(esslöffel|essloeffel)\b/gi, "EL");
   t = t.replace(/\b(teelöffel|teeloeffel)\b/gi, "TL");
@@ -176,12 +202,11 @@ export function parseRecipeText(raw){
     else if (st === "z") zl.push(bullet(l));
     else if (st === "s") sl.push(l);
   });
-  const amount = /^(\d|½|¼|¾|ein |eine |einen |etwas |je |prise |n\. ?b\.|nach geschmack)/i;
   if (!sawZ) {
     zl.length = 0; sl.length = 0;
     lines.forEach(l => {
       const b = bullet(l);
-      if (amount.test(b) && b.length < 80 && !/[.!?]$/.test(b) && !/\bkcal\b/i.test(b)) zl.push(b);
+      if (looksLikeIngredient(b) && b.length < 80 && !/[.!?]$/.test(b) && !/\bkcal\b/i.test(b)) zl.push(b);
       else if (b.length >= 25 && l !== head[0]) sl.push(l);
     });
   }

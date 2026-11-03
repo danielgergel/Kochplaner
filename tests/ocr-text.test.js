@@ -32,6 +32,53 @@ test("Rezepttext: Zutaten bleiben, Unsinn fällt weg", () => {
   assert.ok(r.dropped.some(l => l.includes("EZI")));
 });
 
+test("Brüche, OCR-Fehlleser und Gewürze ohne Menge bleiben Zutaten", () => {
+  const raw = [
+    "Hähnchen aus dem Airfryer",
+    "asdfgh qwerty !!!",
+    "1/2 TL Salz",
+    "112 TL Kreuzkümmel",
+    "V2 EL Paprika",
+    "l/2 TL Öl",
+    "1 1/2 EL Öl",
+    "Pfeffer",
+    "Salz",
+    "etwas Paprikapulver",
+    "1 Prise Zucker",
+    "½ TL Kreuzkümmel",
+    "1 Pck Backpulver",
+    "1 Bund Petersilie",
+    "2 Zehen Knoblauch",
+    "Salz nach Geschmack",
+    'EZI BEN X w"xBY ne',
+    "112 g Hähnchenbrust",
+    "200g Reis",
+    "Zubereitung",
+    "Bei 180 Grad 12 Minuten im Airfryer garen.",
+  ].join("\n");
+  const r = parseRecipeText(raw);
+  assert.ok(r.z.includes("0,5 TL Salz"));
+  assert.ok(r.z.includes("0,5 TL Kreuzkümmel"));
+  assert.ok(r.z.includes("0,5 EL Paprika"));
+  assert.ok(r.z.includes("0,5 TL Öl"));
+  assert.ok(r.z.includes("1,5 EL Öl"));
+  assert.ok(r.z.includes("Pfeffer"));
+  assert.ok(r.z.includes("Salz"));
+  assert.ok(r.z.includes("etwas Paprikapulver"));
+  assert.ok(r.z.includes("1 Prise Zucker"));
+  assert.ok(r.z.some(z => z.includes("Kreuzkümmel") && z.startsWith("0,5 TL")));
+  assert.ok(r.z.includes("1 Pck Backpulver"));
+  assert.ok(r.z.includes("1 Bund Petersilie"));
+  assert.ok(r.z.includes("2 Zehen Knoblauch"));
+  assert.ok(r.z.includes("Salz nach Geschmack"));
+  assert.ok(r.z.includes("112 g Hähnchenbrust"));
+  assert.ok(r.z.includes("200 g Reis"));
+  assert.ok(r.s.some(s => /180/.test(s) && /Airfryer/.test(s)));
+  assert.ok(r.dropped.some(l => l.includes("EZI") || l.includes("qwerty") || l.includes("asdfgh")));
+  assert.equal(cleanLine("qwerty zxcv !!!"), null);
+  assert.equal(normalizeAmount("112 g Mehl"), "112 g Mehl");
+});
+
 test("Wörter unter der Vertrauensgrenze fallen weg, sichere Zutat bleibt", () => {
   const data = {
     lines: [

@@ -6,7 +6,7 @@ import { estimateRecipe } from "./nutrition.js";
 import { NSVIDEO } from "./data/wake.js";
 import { showPanel, hidePanel, closePanel, setDiceTimer, clearDiceTimer } from "./panels.js";
 import { diceResult, setDiceResult, openFromPanel, takeBehind } from "./panel-return.js";
-import { parseRecipeText } from "./ocr-text.js";
+import { deviceGuess, aiOnline, AI_NOTE, adoptRecipeText, fetchSteps } from "./ai-recipe.js";
 import { badgeOf, idNumber, recipeRank, clearSearchCache } from "./recipe-badge.js";
 
 let shareHook = () => {};
@@ -351,12 +351,30 @@ export function crHtml(id){
    <label class="full">Zeit<input id="cr-t" value="${esc(r ? r.t : "")}" placeholder="automatisch"></label>
    <label class="full">Zutaten, eine pro Zeile<textarea id="cr-z" placeholder="400 g Hähnchenbrust&#10;200 g Reis (roh)&#10;1 Paprika&#10;Salz, Pfeffer">${esc(r ? r.z.join("\n") : "")}</textarea></label>
    <label class="full">Zubereitung, ein Schritt pro Zeile<textarea id="cr-s" placeholder="Reis kochen.&#10;Hähnchen würfeln und anbraten.">${esc(r ? r.s.join("\n") : "")}</textarea></label>
+   <label class="full">Gerät<select id="cr-dev"><option>Airfryer</option><option>Ofen</option><option>Pfanne</option></select></label>
+   <button class="btn" type="button" data-crai id="cr-ai">Anleitung erstellen</button>
+   <p class="note" id="cr-aihint" style="margin:0"></p>
   </div>
   <div class="stack"><button class="btn" data-crcalc>Kalorien, Eiweiß und Zeit berechnen</button><p class="note" id="crhint" style="margin:0">Nur ungefähre Werte. Lässt du die Felder leer, rechnet die App beim Speichern selbst.</p><button class="btn pri" data-crsave="${id || ""}">Speichern</button></div></div>`;
 }
+let aiMade = false;
 export function openCr(id){
   ui.pm = "C";
+  aiMade = false;
   showPanel(crHtml(id || ""));
+  const rec = id ? catalog.all[id] : null;
+  const dev = $("#cr-dev");
+  if (dev) dev.value = deviceGuess(rec && rec.n, rec && rec.z);
+  paintAi();
+}
+function paintAi(){
+  const on = aiOnline();
+  const btn = $("#cr-ai");
+  const hint = $("#cr-aihint");
+  if (btn) btn.disabled = !on;
+  if (hint) hint.textContent = on
+    ? "Die Schritte landen im Feld und lassen sich ändern."
+    : "Ohne Internet bleibt der Knopf aus. Trag die Schritte selbst ein.";
 }
 function crLines(id){
   return ($(id) || { value:"" }).value.split("\n").map(x => x.trim()).filter(Boolean);
@@ -393,6 +411,7 @@ export function saveCr(id){
     if (base.pt) rec.pt = base.pt;
     if (base.w) rec.w = base.w;
     ["note","q","u","mp"].forEach(k => { if (base[k]) rec[k] = base[k]; });
+    if (aiMade && s.length) rec.note = noteWithAi(rec.note);
     if (!ST.ov || typeof ST.ov !== "object" || Array.isArray(ST.ov)) ST.ov = {};
     if (sameAsBase(base, rec)) delete ST.ov[id];
     else ST.ov[id] = rec;
@@ -400,6 +419,7 @@ export function saveCr(id){
     rec.ns = true;
     rec.pt = "für 2 Personen";
     rec.cust = 1;
+    if (aiMade && s.length) rec.note = noteWithAi("");
     const i = ST.cust.findIndex(c => c.id === rec.id);
     if (i >= 0) ST.cust[i] = rec; else ST.cust.push(rec);
   }
@@ -415,10 +435,16 @@ export function saveCr(id){
   toast("Rezept gespeichert");
   shareHook(rec.id, "save");
 }
+function noteWithAi(prev){
+  const text = String(prev || "").trim();
+  if (text.includes(AI_NOTE.replace(/\.$/, ""))) return text.endsWith(".") ? text : text + ".";
+  return text ? text + " " + AI_NOTE : AI_NOTE;
+}
 function sameAsBase(base, rec){
   const sameList = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
   return base.n === rec.n && Number(base.k) === Number(rec.k) && Number(base.p) === Number(rec.p)
     && (base.t || "–") === rec.t && (base.c || "") === (rec.c || "")
+    && (base.note || "") === (rec.note || "")
     && sameList(base.z, rec.z) && sameList(base.s, rec.s);
 }
 function setField(id, v){
@@ -596,9 +622,25 @@ export function bindRecipeDom(){
     if (d.crraw !== undefined) {
       const raw = $("#cr-raw");
       if (!raw || !raw.value.trim()) { toast("Bitte erst Text einfügen"); return; }
-      const parsed = parseRecipeText(raw.value);
-      if (parsed.dropped.length) showOcrReview(parsed);
-      else applyParsed(parsed);
+      adoptRecipeText(raw.value).then(parsed => {
+        if (parsed.dropped.length) showOcrReview(parsed);
+        else applyParsed(parsed);
+      });
+      return;
+    }
+    if (d.crai !== undefined) {
+      if (!aiOnline()) { paintAi(); toast("Ohne Internet keine Anleitung"); return; }
+      const btn = $("#cr-ai");
+      if (btn) btn.disabled = true;
+      const name = ($("#cr-n") || { value:"" }).value;
+      fetchSteps(name, crLines("#cr-z"), ($("#cr-dev") || { value:"" }).value).then(steps => {
+        paintAi();
+        if (!steps) { toast("Anleitung gerade nicht möglich"); return; }
+        const area = $("#cr-s");
+        if (area) area.value = steps.join("\n");
+        aiMade = true;
+        toast("Schritte eingesetzt, bitte prüfen");
+      });
       return;
     }
     if (d.crrev !== undefined) { applyReview(); return; }
