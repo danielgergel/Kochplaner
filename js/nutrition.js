@@ -47,22 +47,51 @@ export function parsePiece(raw){
   return { raw:String(raw).trim(), q, n, hasN, unit, foods:findFoods(q), fi:0 };
 }
 
+const fmtq = x => String(Math.round(x * 10) / 10).replace(".", ",");
+
+export function isDrink(f){
+  return !!(f && Array.isArray(f._u) && f._u.some(u => u[0] === "ml" || u[2] === "ml"));
+}
+
+/** Haushaltsgröße mit Menge. g und ml bleiben ohne Klammer. Getränke (ml-Einheit) in ml. */
+export function unitCaption(name, amount, drink){
+  if (name === "g" || name === "ml") return name;
+  const kind = drink ? "ml" : "g";
+  return name + " (" + fmtq(amount) + " " + kind + ")";
+}
+
+function pickUnit(f, pc){
+  if (pc && pc.unitForce) {
+    const want = nm(pc.unitForce);
+    const forced = f._u.find(u => u[2] === pc.unitForce || u[0] === want);
+    if (forced) return forced;
+  }
+  const raw = " " + nm(pc && pc.raw || "") + " ";
+  const named = f._u.filter(u => u[2] !== "g" && u[2] !== "ml").slice().sort((a, b) => b[0].length - a[0].length);
+  for (const u of named) {
+    if (u[0] && raw.includes(" " + u[0] + " ")) return u;
+  }
+  if (pc && pc.unit) {
+    const hit = f._u.find(x => x[0] === pc.unit || stripPl(x[0]) === stripPl(pc.unit));
+    if (hit) return hit;
+  }
+  return f._u.find(x => x[2] !== "g" && x[2] !== "ml") || f._u[0];
+}
+
 export function calcPiece(pc){
   const f = pc.foods[pc.fi];
   if (!f) return null;
-  let g, label;
-  const fmtq = x => String(Math.round(x * 10) / 10).replace(".", ",");
-  if (pc.unit && GUNIT[pc.unit] !== undefined && !["el", "tl"].includes(pc.unit)) { g = pc.n * GUNIT[pc.unit]; label = fmtq(pc.n) + " " + pc.unit; }
-  else if (pc.unit === "el" || pc.unit === "tl") { g = pc.n * GUNIT[pc.unit]; label = fmtq(pc.n) + " " + pc.unit.toUpperCase(); }
-  else if (!pc.unit && pc.hasN && pc.n >= 20) { g = pc.n; label = fmtq(g) + " g"; }
+  let g, label, unitName = "";
+  if (pc.unit && GUNIT[pc.unit] !== undefined && !["el", "tl"].includes(pc.unit)) { g = pc.n * GUNIT[pc.unit]; label = fmtq(pc.n) + " " + pc.unit; unitName = pc.unit; }
+  else if (pc.unit === "el" || pc.unit === "tl") { g = pc.n * GUNIT[pc.unit]; label = fmtq(pc.n) + " " + pc.unit.toUpperCase(); unitName = pc.unit.toUpperCase(); }
+  else if (!pc.unit && !pc.unitForce && pc.hasN && pc.n >= 20) { g = pc.n; label = fmtq(g) + " g"; unitName = "g"; }
   else {
-    let u = null;
-    if (pc.unit) u = f._u.find(x => x[0] === pc.unit || stripPl(x[0]) === stripPl(pc.unit));
-    if (!u) u = f._u.find(x => x[2] !== "g" && x[2] !== "ml") || f._u[0];
+    const u = pickUnit(f, pc);
+    unitName = u[2];
     if (u[2] === "g" || u[2] === "ml") { g = pc.n * (pc.hasN ? 1 : 100); label = fmtq(g) + " " + u[2]; }
-    else { g = pc.n * u[1]; label = fmtq(pc.n) + " " + u[2]; }
+    else { g = pc.n * u[1]; label = fmtq(pc.n) + " " + unitCaption(u[2], u[1], isDrink(f)); }
   }
-  return { f, g, label, k:f.k * g / 100, p:f.p * g / 100 };
+  return { f, g, label, unitName, k:f.k * g / 100, p:f.p * g / 100 };
 }
 
 const SKIPZ = /salz|pfeffer|gewuerz|gewürz|wasser|paprikapulver|oregano|chili|kraeuter|kräuter|knoblauchpulver|zwiebelpulver|kreuzkuemmel|kreuzkümmel|zimt|muskat|petersilie|schnittlauch|dill|basilikum/i;
