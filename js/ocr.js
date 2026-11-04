@@ -1,7 +1,8 @@
 /* Screenshot einlesen: Bild aufbereiten, deutsch erkennen, unsichere Wörter verwerfen. */
 import { $, toast } from "./util.js";
-import { textFromRecognition, parseRecipeText } from "./ocr-text.js";
+import { textFromRecognition } from "./ocr-text.js";
 import { showOcrReview } from "./recipes.js";
+import { adoptRecipeText, aiOnline } from "./ai-recipe.js";
 
 const tessBase = new URL("../vendor/tesseract/", import.meta.url);
 let tessP = null;
@@ -123,7 +124,8 @@ export function bindOcr(){
       }
       const raw = $("#cr-raw");
       if (raw) { raw.value = text; const det = raw.closest("details"); if (det) det.open = true; }
-      const parsed = parseRecipeText(text);
+      if (st() && aiOnline()) st().textContent = "Text wird geordnet …";
+      const parsed = await adoptRecipeText(text);
       showOcrReview(parsed, dropped.filter(l => !parsed.dropped.includes(l)));
     } catch (e) {
       if (st()) st().textContent = "Texterkennung nicht möglich. Du kannst den Text auch unten einfügen.";

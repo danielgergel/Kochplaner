@@ -1,0 +1,116 @@
+/* Prüfung der KI-Antworten und die Aufrufe. Ungeprüftes JSON kommt nicht ins Rezept. */
+import { parseRecipeText } from "./ocr-text.js";
+
+export const AI_BASE = "https://kochplaner-ki.danielgergel.workers.dev";
+export const AI_NOTE = "Anleitung von KI erstellt.";
+
+const DEVICES = new Set(["Airfryer", "Ofen", "Pfanne"]);
+
+export function aiOnline(){
+  return typeof navigator === "undefined" || navigator.onLine !== false;
+}
+
+export function deviceGuess(name, ingredients){
+  const t = (String(name || "") + " " + (Array.isArray(ingredients) ? ingredients.join(" ") : String(ingredients || ""))).toLowerCase();
+  if (/airfryer|heissluft|heißluft/.test(t)) return "Airfryer";
+  if (/ofen|umluft|ober\/unterhitze/.test(t)) return "Ofen";
+  if (/pfanne|anbraten|braten/.test(t)) return "Pfanne";
+  return "Airfryer";
+}
+
+function clip(v, max){
+  return typeof v === "string" ? v.trim().slice(0, max) : "";
+}
+
+export function prepFromAi(data){
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const name = clip(data.name, 80);
+  let portionen = Number(data.portionen);
+  if (!Number.isFinite(portionen) || portionen < 1 || portionen > 24) portionen = 0;
+  else portionen = Math.round(portionen);
+  if (!Array.isArray(data.zutaten) || !data.zutaten.length || data.zutaten.length > 40) return null;
+  const z = [];
+  for (const row of data.zutaten) {
+    if (!row || typeof row !== "object") continue;
+    if (typeof row.zutat !== "string" || row.zutat.trim().length < 2 || row.zutat.trim().length > 80) continue;
+    if (typeof row.menge === "string" && row.menge.trim().length > 20) continue;
+    if (typeof row.einheit === "string" && row.einheit.trim().length > 20) continue;
+    const zutat = row.zutat.trim();
+    const menge = typeof row.menge === "number" && Number.isFinite(row.menge)
+      ? String(row.menge).replace(".", ",").slice(0, 20)
+      : clip(row.menge, 20);
+    const einheit = clip(row.einheit, 20);
+    const line = [menge, einheit, zutat].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+    if (line.length > 120) continue;
+    z.push(line);
+  }
+  if (!z.length) return null;
+  const s = [];
+  if (Array.isArray(data.schritte)) {
+    for (const step of data.schritte.slice(0, 20)) {
+      const t = clip(step, 400);
+      if (t.length >= 8) s.push(t);
+    }
+  }
+  return { n: name, z, s, portions: portionen };
+}
+
+export function stepsFromAi(data){
+  if (!data || typeof data !== "object" || !Array.isArray(data.schritte)) return null;
+  const s = [];
+  for (const step of data.schritte.slice(0, 12)) {
+    const t = clip(step, 400);
+    if (t.length < 12) continue;
+    s.push(t);
+  }
+  if (s.length < 2) return null;
+  const blob = s.join(" ");
+  if (!/\d+\s*°/.test(blob) || !/\d+\s*min/i.test(blob)) return null;
+  return s;
+}
+
+export function parsedWithAi(local, remote, online){
+  if (!online) return local;
+  const ai = prepFromAi(remote);
+  if (!ai) return local;
+  return {
+    n: ai.n || local.n,
+    z: ai.z,
+    s: ai.s.length ? ai.s : local.s,
+    t: local.t,
+    k: local.k,
+    p: local.p,
+    portions: ai.portions || local.portions,
+    dropped: local.dropped || [],
+  };
+}
+
+async function postAi(path, body){
+  if (!aiOnline()) return null;
+  try {
+    const res = await fetch(AI_BASE + path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function adoptRecipeText(text){
+  const local = parseRecipeText(text);
+  if (!aiOnline()) return local;
+  const remote = await postAi("/aufbereiten", { text: String(text || "").slice(0, 8000) });
+  return parsedWithAi(local, remote, true);
+}
+
+export async function fetchSteps(name, ingredients, device){
+  if (!aiOnline()) return null;
+  const list = (Array.isArray(ingredients) ? ingredients : []).slice(0, 40).map(x => String(x).slice(0, 120));
+  const geraet = DEVICES.has(device) ? device : deviceGuess(name, list);
+  const remote = await postAi("/anleitung", { name: String(name || "").slice(0, 80), zutaten: list, geraet });
+  return stepsFromAi(remote);
+}

@@ -1,5 +1,5 @@
 /* Service Worker für den Kochplaner: App, Schriften und Bibliotheken liegen im Zwischenspeicher, damit sie ohne Internet starten. */
-const V = "kochplaner-v24";
+const V = "kochplaner-v25";
 const CORE = [
   "./",
   "index.html",
@@ -15,6 +15,7 @@ const CORE = [
   "js/nutrition.js",
   "js/ocr-text.js",
   "js/ocr.js",
+  "js/ai-recipe.js",
   "js/recipe-badge.js",
   "js/diet.js",
   "js/share.js",
@@ -59,8 +60,9 @@ const put = (r, res) => { try { if (res && (res.status === 200 || res.type === "
 const cached = r => caches.match(r).then(m => m || null);
 const shell = () => caches.match("index.html");
 self.addEventListener("fetch", e => {
+  const u = new URL(e.request.url);
+  if (u.hostname === "kochplaner-ki.danielgergel.workers.dev") return;
   const r = e.request; if (r.method !== "GET") return;
-  const u = new URL(r.url);
   const nav = r.mode === "navigate" || (r.headers.get("accept") || "").includes("text/html");
   if (u.origin === location.origin) {
     e.respondWith((async () => {
