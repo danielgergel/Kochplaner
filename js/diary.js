@@ -2,7 +2,7 @@ import { catalog, DY, ST, ui, dsave, persist } from "./state.js";
 import { $, esc, toast, f1, dkey, dlabel, WDSHORT } from "./util.js";
 import { grp } from "./recipes.js";
 import { badgeOf, haystack } from "./recipe-badge.js";
-import { parsePiece, calcPiece } from "./nutrition.js";
+import { parsePiece, calcPiece, isDrink, unitCaption } from "./nutrition.js";
 import { showPanel } from "./panels.js";
 
 export function tot(k){
@@ -111,7 +111,10 @@ function qHtml(){
     if (!c) return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(pc.raw)}</b><span class="meta">Nicht gefunden. Trag Kalorien und Eiweiß unten selbst ein oder scanne den Barcode.</span></div>`;
     ok++; tk += c.k; tp += c.p;
     const alts = pc.foods.map((f, j) => j === pc.fi ? "" : `<button class="chipb" data-qalt="${i}:${j}">${esc(f.n)}</button>`).join("");
-    return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(c.f.n)} · ${esc(c.label)}</b><span class="meta">${Math.round(c.k)} kcal · ${f1(c.p)} g Eiweiß</span>${alts ? `<div class="alts">Meintest du: ${alts}</div>` : ""}</div>`;
+    const drink = isDrink(c.f);
+    const units = (c.f._u || []).filter(u => u[2] !== "g" && u[2] !== "ml" && u[2] !== c.unitName);
+    const uchips = units.length ? units.map(u => `<button class="chipb" data-qunit="${i}:${esc(u[2])}">${esc(unitCaption(u[2], u[1], drink))}</button>`).join("") : "";
+    return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(c.f.n)} · ${esc(c.label)}</b><span class="meta">${Math.round(c.k)} kcal · ${f1(c.p)} g Eiweiß</span>${uchips ? `<div class="alts">Einheit: ${uchips}</div>` : ""}${alts ? `<div class="alts">Meintest du: ${alts}</div>` : ""}</div>`;
   }).join("");
   return `<div class="box" style="margin-top:6px">${rows}</div>` + (ok ? `<button class="btn pri" data-qadd style="width:100%;margin-top:8px">Eintragen: ${Math.round(tk)} kcal · ${f1(tp)} g Eiweiß</button>` : "");
 }
@@ -371,7 +374,14 @@ export function bindDiary(){
       }
       if (d.dyf !== undefined) { const f = DY.foods[+d.dyf]; addEntry({ n:f.n, k:f.k, p:f.p }); drawDy(true); toast("Eingetragen"); return; }
       if (d.dyfx !== undefined) { DY.foods.splice(+d.dyfx, 1); dsave(); drawDy(true); return; }
-      if (d.qalt) { const [i, j] = d.qalt.split(":").map(Number); QP[i].fi = j; $("#qkp").innerHTML = qHtml(); return; }
+      if (d.qalt) { const [i, j] = d.qalt.split(":").map(Number); QP[i].fi = j; delete QP[i].unitForce; $("#qkp").innerHTML = qHtml(); return; }
+      if (d.qunit) {
+        const cut = d.qunit.indexOf(":");
+        const i = Number(d.qunit.slice(0, cut));
+        if (QP[i]) QP[i].unitForce = d.qunit.slice(cut + 1);
+        $("#qkp").innerHTML = qHtml();
+        return;
+      }
       if (d.qadd !== undefined) {
         let n = 0;
         QP.forEach(pc => { const c = calcPiece(pc); if (c) { addEntry({ n:c.f.n + " (" + c.label + ")", k:c.k, p:c.p }); n++; } });
