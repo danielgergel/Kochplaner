@@ -72,6 +72,7 @@ if (!(Number(DY.goal.k) > 0)) DY.goal.k = 2100;
 if (!(Number(DY.goal.p) > 0)) DY.goal.p = 150;
 if (!DY.days || typeof DY.days !== "object") DY.days = {};
 if (!Array.isArray(DY.foods)) DY.foods = [];
+if (!Array.isArray(DY.meals)) DY.meals = [];
 
 export let HH = null;
 {

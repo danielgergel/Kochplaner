@@ -114,3 +114,29 @@ export async function fetchSteps(name, ingredients, device){
   const remote = await postAi("/anleitung", { name: String(name || "").slice(0, 80), zutaten: list, geraet });
   return stepsFromAi(remote);
 }
+
+/* Mahlzeit schätzen: Text -> Zutaten mit Gramm, kcal, Eiweiß. Geprüft wird hier und im Worker. */
+export const MEAL_MAX = 1000;
+const cleanName = v => (typeof v === "string" ? v : "").replace(/[\u0000-\u001f\u007f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+function numIn(v, min, max){
+  const n = typeof v === "number" ? v : (typeof v === "string" && v.trim() !== "" ? Number(v.replace(",", ".")) : NaN);
+  return Number.isFinite(n) && n >= min && n <= max ? n : null;
+}
+export function mealFromAi(data){
+  if (!data || typeof data !== "object" || !Array.isArray(data.zutaten)) return null;
+  const out = [];
+  for (const row of data.zutaten.slice(0, 12)) {
+    if (!row || typeof row !== "object") continue;
+    const n = cleanName(row.name), g = numIn(row.gramm, 1, 3000), k = numIn(row.kcal, 0, 5000), p = numIn(row.eiweiss, 0, 300);
+    if (n.length < 2 || g == null || k == null || p == null) continue;
+    out.push({ n, g: Math.round(g * 10) / 10, k: Math.round(k), p: Math.round(p * 10) / 10 });
+  }
+  return out.length ? out : null;
+}
+export async function fetchMeal(text){
+  if (!aiOnline()) return null;
+  const t = String(text || "").trim().slice(0, MEAL_MAX);
+  if (!t) return null;
+  const remote = await postAi("/schaetzen", { text: t });
+  return mealFromAi(remote);
+}

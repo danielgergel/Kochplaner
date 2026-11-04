@@ -4,6 +4,7 @@ import { grp } from "./recipes.js";
 import { badgeOf, haystack } from "./recipe-badge.js";
 import { parsePiece, calcPiece, isDrink, unitCaption } from "./nutrition.js";
 import { showPanel } from "./panels.js";
+import { mealBlockHtml, bindMeal } from "./meal-ui.js";
 
 export function tot(k){
   const e = DY.days[k] || [];
@@ -227,6 +228,8 @@ export function dyHtml(){
   <div class="dnav"><button data-dyd="-1" aria-label="Vorheriger Tag">‹</button><b>${dlabel(ui.dyk)}</b><button data-dyd="1" aria-label="Nächster Tag">›</button></div>
   <div class="tot"><div><div class="row1"><b>${Math.round(t.k)} kcal</b><span>Ziel ${G.k} · noch ${Math.round(G.k - t.k)}</span></div>${barHtml(t.k, G.k)}</div>
    <div><div class="row1"><b>${f1(t.p)} g Eiweiß</b><span>Ziel ${G.p} · noch ${f1(G.p - t.p)}</span></div>${barHtml(t.p, G.p, true)}</div></div>
+  <h3 class="sec">Mahlzeit</h3>
+  ${mealBlockHtml()}
   <h3 class="sec">Schnell eintragen</h3>
   <input id="qk" class="finp" placeholder="z. B. 4 Kaffee, 2 Brötchen mit Butter, Pommes" autocomplete="off" autocapitalize="none" aria-label="Was hast du gegessen oder getrunken?">
   <div id="qkp">${qHtml()}</div>
@@ -242,7 +245,8 @@ export function dyHtml(){
    <button class="btn pri full" data-dyown>Eintragen</button></div>`)}
   ${foods}
   ${weekChartHtml()}
-  </div>`;
+  </div>
+  <button id="dyfab" data-scan aria-label="Barcode scannen und ins Tagebuch eintragen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2"/><path d="M8 8v8M11 8v8M14 8v8M17 8v8"/></svg><span>Scannen</span></button>`;
 }
 
 function eatenHtml(ents){
@@ -281,6 +285,7 @@ export function openDy(opts){
 }
 
 export function bindDiary(){
+  bindMeal({ add:addEntry, redraw:() => drawDy(true) });
   document.addEventListener("input", ev => {
     if (ev.target.id === "dyq") { ui.dyq = ev.target.value; const r = $("#dyres"); if (r) r.innerHTML = dyResHtml(); }
     if (ev.target.id === "dg-k" || ev.target.id === "dg-p") {
