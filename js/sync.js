@@ -4,6 +4,7 @@ import { sanitizeField, sanitizeDiary, diaryPayloadOk } from "./validate.js";
 import { rebuildAll } from "./recipes.js";
 import { shopLabels } from "./shopcalc.js";
 import { toast } from "./util.js";
+import { mergeDayEntries } from "./diary.js";
 
 let FB = null;
 let fbRef = null, unsub = null, last = {}, ready = false, saving = false, dirty = false, joinMode = false;
@@ -162,11 +163,8 @@ export function startSync(){
 
 function dMerge(r){
   const inc = sanitizeDiary(r);
-  const sig = e => [e.n, e.k, e.p, e.m].join("|");
   Object.keys(inc.days || {}).forEach(k => {
-    if (!DY.days[k]) { DY.days[k] = inc.days[k]; return; }
-    const have = new Set((DY.days[k] || []).map(sig));
-    inc.days[k].forEach(e => { if (!have.has(sig(e))) DY.days[k].push(e); });
+    DY.days[k] = mergeDayEntries(DY.days[k], inc.days[k]);
   });
   (inc.foods || []).forEach(f => {
     if (!DY.foods.some(x => x.n.toLowerCase() === f.n.toLowerCase())) DY.foods.push(f);

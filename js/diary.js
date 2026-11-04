@@ -1,8 +1,8 @@
 import { catalog, DY, ST, ui, dsave, persist } from "./state.js";
 import { $, esc, toast, f1, dkey, dlabel, WDSHORT } from "./util.js";
 import { grp } from "./recipes.js";
-import { haystack } from "./recipe-badge.js";
-import { parsePiece, calcPiece } from "./nutrition.js";
+import { badgeOf, haystack } from "./recipe-badge.js";
+import { parsePiece, calcPiece, isDrink, unitCaption } from "./nutrition.js";
 import { showPanel } from "./panels.js";
 
 export function tot(k){
@@ -25,10 +25,63 @@ export function addEntry(e, k){
   dsave();
 }
 
+export function recipeEntry(r, extra){
+  return Object.assign({ n:r.n, k:r.k, p:r.p, rid:r.id }, extra || {});
+}
+
+/** Index für den Abgleich: gespeicherte id gewinnt, sonst nur ein exakter Name. */
+export function recipeLinkIndex(recipes){
+  const byId = new Map();
+  const byName = new Map();
+  for (const r of recipes || []) {
+    if (!r || typeof r.id !== "string" || !r.id) continue;
+    byId.set(r.id, r.id);
+    const n = typeof r.n === "string" ? r.n.trim() : "";
+    if (!n) continue;
+    if (byName.has(n)) byName.set(n, "");
+    else byName.set(n, r.id);
+  }
+  return { byId, byName };
+}
+
+export function entryRecipeId(entry, recipes){
+  if (!entry || typeof entry !== "object") return null;
+  const index = recipes && recipes.byId ? recipes : recipeLinkIndex(recipes);
+  if (typeof entry.rid === "string" && entry.rid) return index.byId.has(entry.rid) ? entry.rid : null;
+  const n = typeof entry.n === "string" ? entry.n.trim() : "";
+  if (!n) return null;
+  const id = index.byName.get(n);
+  return id || null;
+}
+
+/** Gleicher Eintrag (Name, kcal, Eiweiß, Menge) bleibt einer. Eine fehlende Rezept-id wird ergänzt. */
+export function mergeDayEntries(local, incoming){
+  const sig = e => [e.n, e.k, e.p, e.m].join("|");
+  const out = [];
+  const by = new Map();
+  for (const e of local || []) {
+    const copy = Object.assign({}, e);
+    out.push(copy);
+    by.set(sig(copy), copy);
+  }
+  for (const e of incoming || []) {
+    const have = by.get(sig(e));
+    if (!have) {
+      const copy = Object.assign({}, e);
+      out.push(copy);
+      by.set(sig(copy), copy);
+      continue;
+    }
+    if (!have.rid && e.rid) have.rid = e.rid;
+    if (!have.gk && e.gk) have.gk = 1;
+  }
+  return out;
+}
+
 export function markEaten(id){
   const r = catalog.all[id];
   if (!r) return;
-  addEntry({ n:r.n, k:r.k, p:r.p, rid:id, gk:1 }, dkey(new Date()));
+  addEntry(recipeEntry(r, { gk:1 }), dkey(new Date()));
   if (ST.sel[id]) { (ST.done || (ST.done = {}))[id] = 1; persist(); }
 }
 
@@ -58,7 +111,10 @@ function qHtml(){
     if (!c) return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(pc.raw)}</b><span class="meta">Nicht gefunden. Trag Kalorien und Eiweiß unten selbst ein oder scanne den Barcode.</span></div>`;
     ok++; tk += c.k; tp += c.p;
     const alts = pc.foods.map((f, j) => j === pc.fi ? "" : `<button class="chipb" data-qalt="${i}:${j}">${esc(f.n)}</button>`).join("");
-    return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(c.f.n)} · ${esc(c.label)}</b><span class="meta">${Math.round(c.k)} kcal · ${f1(c.p)} g Eiweiß</span>${alts ? `<div class="alts">Meintest du: ${alts}</div>` : ""}</div>`;
+    const drink = isDrink(c.f);
+    const units = (c.f._u || []).filter(u => u[2] !== "g" && u[2] !== "ml" && u[2] !== c.unitName);
+    const uchips = units.length ? units.map(u => `<button class="chipb" data-qunit="${i}:${esc(u[2])}">${esc(unitCaption(u[2], u[1], drink))}</button>`).join("") : "";
+    return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(c.f.n)} · ${esc(c.label)}</b><span class="meta">${Math.round(c.k)} kcal · ${f1(c.p)} g Eiweiß</span>${uchips ? `<div class="alts">Einheit: ${uchips}</div>` : ""}${alts ? `<div class="alts">Meintest du: ${alts}</div>` : ""}</div>`;
   }).join("");
   return `<div class="box" style="margin-top:6px">${rows}</div>` + (ok ? `<button class="btn pri" data-qadd style="width:100%;margin-top:8px">Eintragen: ${Math.round(tk)} kcal · ${f1(tp)} g Eiweiß</button>` : "");
 }
@@ -164,7 +220,7 @@ function dyResHtml(){
 export function dyHtml(){
   const t = tot(ui.dyk), G = DY.goal || { k:2100, p:150 }, ents = DY.days[ui.dyk] || [];
   const undo = ui.undo ? `<div class="undo"><span>Gelöscht: ${esc(ui.undo.e.n)}</span><button class="btn" data-dyundo>Rückgängig</button></div>` : "";
-  const eaten = ents.length ? `<div class="box">` + ents.map((e, i) => `<div class="ent"><b>${esc(e.n)}</b><span class="meta">${Math.round(e.k * e.m)} kcal · ${f1(e.p * e.m)} g Eiweiß</span><div class="eac"><button data-dym="${i}:-0.5" aria-label="Weniger">−</button><span>${f1(e.m)}×</span><button data-dym="${i}:0.5" aria-label="Mehr">+</button><button data-dyx="${i}" aria-label="Löschen">×</button></div></div>`).join("") + `</div>` : '<p class="empty">An diesem Tag ist noch nichts eingetragen.</p>';
+  const eaten = eatenHtml(ents);
   const foods = DY.foods.length ? fold("Meine Lebensmittel", `<div class="box">` + DY.foods.map((f, i) => `<div class="ent"><b>${esc(f.n)}</b><span class="meta">${f.k} kcal · ${f1(f.p)} g Eiweiß</span><div class="eac"><button data-dyf="${i}" aria-label="Heute eintragen" style="width:auto;padding:0 12px">+ Heute</button><button data-dyfx="${i}" aria-label="Aus der Liste löschen">×</button></div></div>`).join("") + `</div>`) : "";
   return `<div class="dtop"><div class="in"><button class="back" data-pc>Schließen</button><span class="wk">Nur auf diesem Handy gespeichert</span></div></div>
   <div class="dbody"><h2>Tagebuch</h2>
@@ -187,6 +243,19 @@ export function dyHtml(){
   ${foods}
   ${weekChartHtml()}
   </div>`;
+}
+
+function eatenHtml(ents){
+  if (!ents.length) return '<p class="empty">An diesem Tag ist noch nichts eingetragen.</p>';
+  const index = recipeLinkIndex(catalog.ALL);
+  return `<div class="box">` + ents.map((e, i) => {
+    const meta = `${Math.round(e.k * e.m)} kcal · ${f1(e.p * e.m)} g Eiweiß`;
+    const controls = `<div class="eac"><button data-dym="${i}:-0.5" aria-label="Weniger">−</button><span>${f1(e.m)}×</span><button data-dym="${i}:0.5" aria-label="Mehr">+</button><button data-dyx="${i}" aria-label="Löschen">×</button></div>`;
+    const id = entryRecipeId(e, index);
+    if (!id) return `<div class="ent"><b>${esc(e.n)}</b><span class="meta">${meta}</span>${controls}</div>`;
+    const badge = badgeOf(id, ST.cust);
+    return `<div class="ent"><button type="button" class="dyopen" data-dyopen="${esc(id)}" aria-label="${esc(e.n)}, Rezept ${esc(badge)} ansehen"><b>${esc(e.n)}<span class="id">${esc(badge)}</span></b><span class="meta">${meta}</span></button>${controls}</div>`;
+  }).join("") + `</div>`;
 }
 
 export function drawDy(keep){
@@ -263,7 +332,7 @@ export function bindDiary(){
       }
       if (d.dyr) {
         const r = catalog.all[d.dyr];
-        addEntry({ n:r.n, k:r.k, p:r.p, rid:r.id });
+        addEntry(recipeEntry(r));
         ui.dyq = "";
         drawDy(true);
         toast("Eingetragen");
@@ -305,7 +374,14 @@ export function bindDiary(){
       }
       if (d.dyf !== undefined) { const f = DY.foods[+d.dyf]; addEntry({ n:f.n, k:f.k, p:f.p }); drawDy(true); toast("Eingetragen"); return; }
       if (d.dyfx !== undefined) { DY.foods.splice(+d.dyfx, 1); dsave(); drawDy(true); return; }
-      if (d.qalt) { const [i, j] = d.qalt.split(":").map(Number); QP[i].fi = j; $("#qkp").innerHTML = qHtml(); return; }
+      if (d.qalt) { const [i, j] = d.qalt.split(":").map(Number); QP[i].fi = j; delete QP[i].unitForce; $("#qkp").innerHTML = qHtml(); return; }
+      if (d.qunit) {
+        const cut = d.qunit.indexOf(":");
+        const i = Number(d.qunit.slice(0, cut));
+        if (QP[i]) QP[i].unitForce = d.qunit.slice(cut + 1);
+        $("#qkp").innerHTML = qHtml();
+        return;
+      }
       if (d.qadd !== undefined) {
         let n = 0;
         QP.forEach(pc => { const c = calcPiece(pc); if (c) { addEntry({ n:c.f.n + " (" + c.label + ")", k:c.k, p:c.p }); n++; } });
@@ -314,6 +390,7 @@ export function bindDiary(){
         toast(n + " Eintrag" + (n > 1 ? "e" : "") + " gespeichert");
         return;
       }
+      if (d.dyopen) { ui.openRecipe(d.dyopen, "Y"); return; }
       if (d.sgadd) { markEaten(d.sgadd); drawDy(true); toast("Eingetragen"); return; }
       if (d.sgopen) { ui.openRecipe(d.sgopen, "Y"); return; }
     }
