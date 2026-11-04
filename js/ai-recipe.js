@@ -1,7 +1,7 @@
 /* Prüfung der KI-Antworten und die Aufrufe. Ungeprüftes JSON kommt nicht ins Rezept. */
 import { parseRecipeText } from "./ocr-text.js";
 
-export const AI_BASE = "https://kochplaner-ki.danielgergel.workers.dev";
+export const AI_BASE = "https://still-resonance-82a6.danielgergel.workers.dev";
 export const AI_NOTE = "Anleitung von KI erstellt.";
 
 const DEVICES = new Set(["Airfryer", "Ofen", "Pfanne"]);

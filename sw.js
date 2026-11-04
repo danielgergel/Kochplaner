@@ -1,5 +1,5 @@
 /* Service Worker für den Kochplaner: App, Schriften und Bibliotheken liegen im Zwischenspeicher, damit sie ohne Internet starten. */
-const V = "kochplaner-v26";
+const V = "kochplaner-v27";
 const CORE = [
   "./",
   "index.html",
@@ -65,7 +65,7 @@ const cached = r => caches.match(r).then(m => m || null);
 const shell = () => caches.match("index.html");
 self.addEventListener("fetch", e => {
   const u = new URL(e.request.url);
-  if (u.hostname === "kochplaner-ki.danielgergel.workers.dev") return;
+  if (u.hostname === "still-resonance-82a6.danielgergel.workers.dev") return;
   const r = e.request; if (r.method !== "GET") return;
   const nav = r.mode === "navigate" || (r.headers.get("accept") || "").includes("text/html");
   if (u.origin === location.origin) {
