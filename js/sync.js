@@ -169,6 +169,12 @@ function dMerge(r){
   (inc.foods || []).forEach(f => {
     if (!DY.foods.some(x => x.n.toLowerCase() === f.n.toLowerCase())) DY.foods.push(f);
   });
+  if (!Array.isArray(DY.meals)) DY.meals = [];
+  (inc.meals || []).forEach(m => {
+    const have = DY.meals.findIndex(x => x.id === m.id);
+    if (have < 0) DY.meals.push(m);
+    else if ((m.u || 0) > (DY.meals[have].u || 0)) DY.meals[have] = m;
+  });
 }
 export function dStop(){
   if (dUnsub) { try { dUnsub(); } catch (e) {} dUnsub = null; }

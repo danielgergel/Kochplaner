@@ -330,7 +330,48 @@ export function sanitizeFood(f){
   const k = macro(f.k, 20000);
   const p = macro(f.p, 2000);
   if (k == null || p == null) return null;
-  return { n, k, p };
+  const out = { n, k, p };
+  /* Optional, für gescannte Produkte: Barcode, Werte pro 100 g, Portionsgröße, Packungsgröße */
+  if (typeof f.b === "string" && /^\d{8,14}$/.test(f.b)) out.b = f.b;
+  const k1 = macro(f.k1, 1000), p1 = macro(f.p1, 100), g = macro(f.g, 5000), q = macro(f.q, 10000);
+  if (k1 != null) { out.k1 = k1; if (p1 != null) out.p1 = p1; }
+  if (g != null && g > 0) out.g = g;
+  if (q != null && q > 0) out.q = q;
+  return out;
+}
+
+/* Eigene kombinierte Mahlzeiten („Mein Frühstück“): Name plus Zutaten mit Mengen und Nährwerten. */
+const MEAL_ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
+export function sanitizeMealItem(it){
+  if (!isObj(it)) return null;
+  const n = str(it.n, 120);
+  if (!n) return null;
+  const k = macro(it.k, 20000);
+  const p = macro(it.p, 2000);
+  const c = macro(it.c, 100000);
+  const ug = macro(it.ug, 100000);
+  if (k == null || p == null || c == null || ug == null || c <= 0 || ug <= 0) return null;
+  const out = { n, k, p, c, ul: str(it.ul, 20) || "g", ug };
+  const lb = str(it.lb, 80);
+  if (lb) out.lb = lb;
+  const nu = str(it.nu, 20), nug = macro(it.nug, 100000);
+  if (nu && nug != null && nug > 0) { out.nu = nu; out.nug = nug; }
+  if (it.gr) out.gr = 1;
+  if (it.dr) out.dr = 1;
+  if (it.por) out.por = 1;
+  return out;
+}
+export function sanitizeMeal(m){
+  if (!isObj(m)) return null;
+  const n = str(m.n, 80);
+  if (!n) return null;
+  const id = typeof m.id === "string" && MEAL_ID_RE.test(m.id) ? m.id : "";
+  if (!id) return null;
+  const items = [];
+  if (Array.isArray(m.items)) for (const it of m.items) { const s = sanitizeMealItem(it); if (s) items.push(s); if (items.length >= 30) break; }
+  if (!items.length) return null;
+  const u = asNumber(m.u);
+  return { id, n, items, u: u != null && u >= 0 ? u : 0 };
 }
 
 export function diaryPayloadOk(raw){
@@ -338,7 +379,7 @@ export function diaryPayloadOk(raw){
 }
 
 export function sanitizeDiary(raw){
-  const out = { goal:{ k:2100, p:150 }, days:{}, foods:[], u:0 };
+  const out = { goal:{ k:2100, p:150 }, days:{}, foods:[], meals:[], u:0 };
   if (!isObj(raw)) return out;
   const gk = macro(raw.goal && raw.goal.k, 9000);
   const gp = macro(raw.goal && raw.goal.p, 500);
@@ -362,6 +403,13 @@ export function sanitizeDiary(raw){
       const s = sanitizeFood(f);
       if (s && !out.foods.some(x => x.n.toLowerCase() === s.n.toLowerCase())) out.foods.push(s);
       if (out.foods.length >= 200) break;
+    }
+  }
+  if (Array.isArray(raw.meals)) {
+    for (const m of raw.meals) {
+      const s = sanitizeMeal(m);
+      if (s && !out.meals.some(x => x.id === s.id)) out.meals.push(s);
+      if (out.meals.length >= 100) break;
     }
   }
   return out;
