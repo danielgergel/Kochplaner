@@ -213,7 +213,9 @@ async function askAi(btn){
   if (!text) { toast("Tippe zuerst, was du gegessen hast"); return; }
   btn.disabled = true;
   btn.textContent = "Die KI schätzt …";
-  const list = await fetchMeal(text);
+  const seen = new Set(), known = [];
+  for (const seg of ML.splitMeal(text)) for (const f of ML.matchFoods(seg, 2)) if (!seen.has(f.n)) { seen.add(f.n); known.push({ n: f.n, k: f.k, p: f.p }); }
+  const list = await fetchMeal(text, known);
   const items = list ? ML.mealItemsFromAi(list) : [];
   const b2 = $("#ml-ai");
   if (b2) { b2.disabled = false; b2.textContent = "Mit KI schätzen"; }

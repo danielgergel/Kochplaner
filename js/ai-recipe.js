@@ -133,10 +133,11 @@ export function mealFromAi(data){
   }
   return out.length ? out : null;
 }
-export async function fetchMeal(text){
+export async function fetchMeal(text, known){
   if (!aiOnline()) return null;
   const t = String(text || "").trim().slice(0, MEAL_MAX);
   if (!t) return null;
-  const remote = await postAi("/schaetzen", { text: t });
+  const bekannt = (Array.isArray(known) ? known : []).slice(0, 12).map(x => ({ n: String(x.n || "").slice(0, 60), k: Number(x.k), p: Number(x.p) })).filter(x => x.n && Number.isFinite(x.k) && Number.isFinite(x.p));
+  const remote = await postAi("/schaetzen", { text: t, bekannt });
   return mealFromAi(remote);
 }
