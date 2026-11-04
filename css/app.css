@@ -145,6 +145,10 @@ h1{font-family:var(--f-disp);font-weight:700;font-size:30px;letter-spacing:.01em
 .ent b{font-weight:600;font-size:16px;min-width:0}
 .ent .meta{grid-column:1}
 .ent .eac{grid-column:2;grid-row:1/3;display:flex;gap:4px;align-items:center}
+.ent .dyopen{grid-column:1;grid-row:1/3;display:block;min-width:0;background:none;border:0;padding:0;text-align:left;color:inherit}
+.ent .dyopen .meta{display:block}
+.ent .dyopen .id{font-size:13px;margin-left:6px}
+.ent .dyopen b::after{content:"";display:inline-block;width:7px;height:7px;margin-left:7px;border-right:1.5px solid var(--muted);border-top:1.5px solid var(--muted);transform:rotate(45deg);vertical-align:1px}
 .ent .eac button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface2);font-size:18px;line-height:1}
 .ent .eac span{min-width:34px;text-align:center;font-weight:600;font-variant-numeric:tabular-nums}
 .frm{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}
