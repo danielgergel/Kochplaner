@@ -2,7 +2,7 @@
 import { $, toast } from "./util.js";
 import { textFromRecognition } from "./ocr-text.js";
 import { showOcrReview } from "./recipes.js";
-import { adoptRecipeText, aiOnline } from "./ai-recipe.js";
+import { adoptRecipeText, aiOnline, fetchBild, fetchSteps, deviceGuess } from "./ai-recipe.js";
 
 const tessBase = new URL("../vendor/tesseract/", import.meta.url);
 let tessP = null;
@@ -109,17 +109,52 @@ async function ocrFiles(files, onProg){
   return { text: kept.filter(Boolean).join("\n\n"), dropped };
 }
 
+export async function imageDataUrl(file){
+  const bmp = await createImageBitmap(file);
+  const long = Math.max(bmp.width, bmp.height);
+  const scale = long > 1600 ? 1600 / long : 1;
+  const w = Math.max(1, Math.round(bmp.width * scale));
+  const h = Math.max(1, Math.round(bmp.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  canvas.getContext("2d").drawImage(bmp, 0, 0, w, h);
+  if (bmp.close) bmp.close();
+  return canvas.toDataURL("image/jpeg", 0.8);
+}
+
+async function fromImages(files){
+  const urls = [];
+  for (const file of files) urls.push(await imageDataUrl(file));
+  const ai = await fetchBild(urls);
+  if (!ai || !ai.z.length) return null;
+  if (!ai.s.length) {
+    const steps = await fetchSteps(ai.n, ai.z, deviceGuess(ai.n, ai.z));
+    if (steps) ai.s = steps;
+  }
+  return { n: ai.n, z: ai.z, s: ai.s, t: "", k: "", p: "", portions: ai.portions, dropped: [] };
+}
+
 export function bindOcr(){
   document.addEventListener("change", async ev => {
     const f = ev.target;
     if (!f || f.id !== "cr-img" || !f.files || !f.files.length) return;
-    const files = [...f.files];
+    const files = [...f.files].slice(0, 3);
     const st = () => $("#crimpst");
     try {
+      if (f.files.length > 3) toast("Es werden die ersten 3 Bilder genommen");
+      if (aiOnline()) {
+        try {
+          if (st()) st().textContent = "Bilder werden verkleinert …";
+          const seen = await fromImages(files);
+          if (seen) { showOcrReview(seen, []); f.value = ""; return; }
+        } catch (e) {}
+      }
       if (st()) st().textContent = "Bild wird vorbereitet …";
       const { text, dropped } = await ocrFiles(files, p => { if (st()) st().textContent = "Text wird erkannt … " + Math.round(p * 100) + " %"; });
       if (!text.trim() && !dropped.length) {
         if (st()) st().textContent = "Kein Text erkannt. Probier einen schärferen Screenshot oder füge den Text unten ein.";
+        f.value = "";
         return;
       }
       const raw = $("#cr-raw");
