@@ -3,6 +3,8 @@ import { parseRecipeText } from "./ocr-text.js";
 
 export const AI_BASE = "https://still-resonance-82a6.danielgergel.workers.dev";
 export const AI_NOTE = "Anleitung von KI erstellt.";
+export const AI_NOTE_ING = "Zutatenmengen von KI geschätzt.";
+export const LINK_HINT = "Bitte die Beschreibung des Videos kopieren und hier einfügen.";
 
 const DEVICES = new Set(["Airfryer", "Ofen", "Pfanne"]);
 
@@ -16,6 +18,63 @@ export function deviceGuess(name, ingredients){
   if (/ofen|umluft|ober\/unterhitze/.test(t)) return "Ofen";
   if (/pfanne|anbraten|braten/.test(t)) return "Pfanne";
   return "Airfryer";
+}
+
+export function stripSocial(text){
+  let t = String(text || "");
+  t = t.replace(/https?:\/\/\S+/gi, " ");
+  t = t.replace(/#[\p{L}\p{N}_]+/gu, " ");
+  t = t.replace(/@[\p{L}\p{N}_.]+/gu, " ");
+  t = t.replace(/\p{Extended_Pictographic}/gu, " ");
+  t = t.replace(/[\uFE0F\u200D]/g, "");
+  t = t.split(/\r?\n/).filter(line => !/^\s*(folge mir|link in (der )?bio|werbung|anzeige|sponsored|unbezahlte werbung|rabattcode|gutscheincode|jetzt shoppen|code\s*[:：])/i.test(line)).join("\n");
+  return t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").replace(/[ \t]{2,}/g, " ").trim();
+}
+
+export function linkOnlyPaste(text){
+  const t = String(text || "").trim();
+  if (!/https?:\/\//i.test(t)) return false;
+  return stripSocial(t).replace(/[^0-9A-Za-zÄÖÜäöüß]/g, "").length < 12;
+}
+
+export function aiMarks(before, after){
+  const lz = (before && before.z) || [];
+  const ls = (before && before.s) || [];
+  const nz = (after && after.z) || [];
+  const ns = (after && after.s) || [];
+  return {
+    z: nz.length > 0 && nz.join("\n") !== lz.join("\n"),
+    s: ns.length > 0 && ns.join("\n") !== ls.join("\n"),
+    k: false,
+  };
+}
+
+function bounded(v, max){
+  const n = typeof v === "number" ? v : parseFloat(String(v == null ? "" : v).replace(",", "."));
+  if (!Number.isFinite(n) || n < 0 || n > max) return null;
+  return Math.round(n);
+}
+
+export function nutritionChoice(local, ai){
+  if (local && Number(local.found) > 0 && (Number(local.k) > 0 || Number(local.p) > 0)) {
+    return { k: String(local.k), p: String(local.p), from: "local" };
+  }
+  const k = bounded(ai && (ai.kcal != null ? ai.kcal : ai.k), 4000);
+  const p = bounded(ai && (ai.eiweiss != null ? ai.eiweiss : ai.p), 300);
+  if (k == null && p == null) return null;
+  return { k: k == null ? "" : String(k), p: p == null ? "" : String(p), from: "ki" };
+}
+
+export function composeAiNote(prev, flags){
+  const bits = [];
+  if (flags && flags.steps) bits.push(AI_NOTE);
+  if (flags && flags.ingredients) bits.push(AI_NOTE_ING);
+  let text = String(prev || "").trim();
+  for (const bit of bits) {
+    const key = bit.replace(/\.$/, "");
+    if (!text.includes(key)) text = text ? text.replace(/\s*$/, "") + " " + bit : bit;
+  }
+  return text;
 }
 
 function clip(v, max){
@@ -100,11 +159,45 @@ async function postAi(path, body){
   }
 }
 
+export async function fetchIngredients(name, steps){
+  if (!aiOnline()) return null;
+  const list = (Array.isArray(steps) ? steps : []).slice(0, 20).map(x => String(x).slice(0, 400));
+  if (!list.length) return null;
+  const remote = await postAi("/zutaten", { name: String(name || "").slice(0, 80), schritte: list });
+  const ai = prepFromAi(remote);
+  if (!ai) return null;
+  return { n: ai.n, z: ai.z, kcal: remote && remote.kcal, eiweiss: remote && remote.eiweiss };
+}
+
 export async function adoptRecipeText(text){
-  const local = parseRecipeText(text);
-  if (!aiOnline()) return local;
-  const remote = await postAi("/aufbereiten", { text: String(text || "").slice(0, 8000) });
-  return parsedWithAi(local, remote, true);
+  if (linkOnlyPaste(text)) {
+    return { linkOnly: true, hint: LINK_HINT, n: "", z: [], s: [], t: "", k: "", p: "", portions: 0, dropped: [], ai: { z: false, s: false, k: false } };
+  }
+  const cleaned = stripSocial(text);
+  const local = parseRecipeText(cleaned);
+  let remote = null;
+  let parsed = local;
+  if (aiOnline()) {
+    remote = await postAi("/aufbereiten", { text: cleaned.slice(0, 8000) });
+    parsed = parsedWithAi(local, remote, true);
+  }
+  const marks = aiMarks(local, parsed);
+  if (parsed.z.length && !parsed.s.length && aiOnline()) {
+    const steps = await fetchSteps(parsed.n || local.n, parsed.z, deviceGuess(parsed.n || local.n, parsed.z));
+    if (steps) { parsed = Object.assign({}, parsed, { s: steps }); marks.s = true; }
+  }
+  if (parsed.s.length && !parsed.z.length && aiOnline()) {
+    const ing = await fetchIngredients(parsed.n || local.n, parsed.s);
+    if (ing && ing.z.length) {
+      parsed = Object.assign({}, parsed, { z: ing.z, n: parsed.n || ing.n, macros: { kcal: ing.kcal, eiweiss: ing.eiweiss } });
+      marks.z = true;
+    }
+  }
+  if (!parsed.macros && remote) parsed.macros = { kcal: remote.kcal, eiweiss: remote.eiweiss };
+  parsed.ai = marks;
+  parsed.dropped = local.dropped || [];
+  parsed.linkOnly = false;
+  return parsed;
 }
 
 export async function fetchSteps(name, ingredients, device){

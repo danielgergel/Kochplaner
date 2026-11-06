@@ -126,7 +126,12 @@ export function bindOcr(){
       if (raw) { raw.value = text; const det = raw.closest("details"); if (det) det.open = true; }
       if (st() && aiOnline()) st().textContent = "Text wird geordnet …";
       const parsed = await adoptRecipeText(text);
-      showOcrReview(parsed, dropped.filter(l => !parsed.dropped.includes(l)));
+      if (parsed.linkOnly) {
+        if (st()) st().textContent = parsed.hint;
+        toast(parsed.hint);
+        return;
+      }
+      showOcrReview(parsed, dropped.filter(l => !(parsed.dropped || []).includes(l)));
     } catch (e) {
       if (st()) st().textContent = "Texterkennung nicht möglich. Du kannst den Text auch unten einfügen.";
       toast("Texterkennung nicht möglich");
