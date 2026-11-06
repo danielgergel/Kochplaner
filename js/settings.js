@@ -7,7 +7,7 @@ import { rebuildAll } from "./recipes.js";
 import { readTheme, saveTheme } from "./theme.js";
 import { claimUsername } from "./share.js";
 
-const APPV = "04.11.2026, Stand 34";
+const APPV = "06.11.2026, Stand 35";
 const ALLSTORES = ["REWE","Lidl","Penny","Aldi","Edeka","Kaufland","Netto"];
 let pending = null;
 

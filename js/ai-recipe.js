@@ -1,7 +1,7 @@
 /* Prüfung der KI-Antworten und die Aufrufe. Ungeprüftes JSON kommt nicht ins Rezept. */
 import { parseRecipeText } from "./ocr-text.js";
 
-export const AI_BASE = "https://still-resonance-82a6.danielgergel.workers.dev";
+export const AI_BASE = "https://kochplaner-ki.danielgergel.workers.dev";
 export const AI_NOTE = "Anleitung von KI erstellt.";
 
 const DEVICES = new Set(["Airfryer", "Ofen", "Pfanne"]);
@@ -105,6 +105,37 @@ export async function adoptRecipeText(text){
   if (!aiOnline()) return local;
   const remote = await postAi("/aufbereiten", { text: String(text || "").slice(0, 8000) });
   return parsedWithAi(local, remote, true);
+}
+
+const IMAGE_RE = /^data:image\/(jpeg|jpg|png|webp);base64,[a-z0-9+/=]+$/i;
+export const BILD_MAX = 4 * 1024 * 1024;
+export const BILD_COUNT = 3;
+
+export function visionImages(list){
+  if (!Array.isArray(list) || list.length < 1 || list.length > BILD_COUNT) return null;
+  const urls = [];
+  let total = 0;
+  for (const raw of list) {
+    if (typeof raw !== "string") return null;
+    const url = raw.replace(/\s/g, "");
+    if (!IMAGE_RE.test(url)) return null;
+    total += url.length;
+    if (total > BILD_MAX) return null;
+    urls.push(url);
+  }
+  return urls;
+}
+
+export function screenshotRoute(visionOk){
+  return visionOk ? "bild" : "ocr";
+}
+
+export async function fetchBild(urls){
+  if (!aiOnline()) return null;
+  const images = visionImages(urls);
+  if (!images) return null;
+  const remote = await postAi("/bild", { bilder: images });
+  return prepFromAi(remote);
 }
 
 export async function fetchSteps(name, ingredients, device){

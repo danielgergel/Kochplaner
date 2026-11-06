@@ -2,8 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { prepFromAi, stepsFromAi, parsedWithAi, deviceGuess, AI_NOTE } from "../js/ai-recipe.js";
-import worker, { corsHeaders } from "../ai-worker/worker.js";
+import { prepFromAi, stepsFromAi, parsedWithAi, deviceGuess, AI_NOTE, AI_BASE, visionImages, screenshotRoute, BILD_MAX } from "../js/ai-recipe.js";
+import worker, { corsHeaders, extractJson } from "../ai-worker/worker.js";
 
 const root = path.resolve(import.meta.dirname, "..");
 const local = { n: "Lokal", z: ["200 g Reis"], s: [], t: "", k: "", p: "", portions: 0, dropped: ["Müll"] };
@@ -80,6 +80,46 @@ test("Worker beantwortet OPTIONS ohne Body und lehnt fremde Origins ab", async (
   const data = await nokey.json();
   assert.equal(data.error, "ki");
   assert.equal(JSON.stringify(data).includes("Salz"), false);
+});
+
+test("Bild-KI: nur jpeg, png und webp, höchstens drei, zusammen unter 4 MB", () => {
+  const png = "data:image/png;base64,aaaa";
+  const jpeg = "data:image/jpeg;base64,bbbb";
+  assert.deepEqual(visionImages([png, jpeg]), [png, jpeg]);
+  assert.equal(visionImages([]), null);
+  assert.equal(visionImages([png, png, png, png]), null);
+  assert.equal(visionImages(["data:image/gif;base64,aaaa"]), null);
+  assert.equal(visionImages(["https://example.com/a.png"]), null);
+  const huge = "data:image/png;base64," + "a".repeat(BILD_MAX);
+  assert.equal(visionImages([huge]), null);
+  assert.equal(screenshotRoute(true), "bild");
+  assert.equal(screenshotRoute(false), "ocr");
+  assert.equal(AI_BASE, "https://kochplaner-ki.danielgergel.workers.dev");
+  const wrapped = extractJson("Hier das Rezept:\n```json\n{\"name\":\"Salat\",\"portionen\":2,\"zutaten\":[{\"menge\":\"1/2\",\"einheit\":\"TL\",\"zutat\":\"Salz\"},{\"menge\":\"\",\"einheit\":\"\",\"zutat\":\"Pfeffer\"}],\"schritte\":[]}\n```");
+  const clean = prepFromAi(wrapped);
+  assert.equal(clean.n, "Salat");
+  assert.ok(clean.z.some(z => z.includes("Salz")));
+  assert.ok(clean.z.some(z => z.includes("Pfeffer")));
+  assert.equal(extractJson("kein json"), null);
+});
+
+test("Worker /bild prüft die Bilder und fällt ohne Schlüssel auf den Fehler zurück", async () => {
+  const okImg = "data:image/png;base64,aaaa";
+  const bad = await worker.fetch(new Request("https://kochplaner-ki.example/bild", {
+    method: "POST",
+    headers: { Origin: "https://danielgergel.github.io", "content-type": "application/json", "CF-Connecting-IP": "bild-bad" },
+    body: JSON.stringify({ bilder: ["data:image/gif;base64,aaaa"] }),
+  }));
+  assert.equal(bad.status, 400);
+  const nokey = await worker.fetch(new Request("https://kochplaner-ki.example/bild", {
+    method: "POST",
+    headers: { Origin: "https://danielgergel.github.io", "content-type": "application/json", "CF-Connecting-IP": "bild-key" },
+    body: JSON.stringify({ bilder: [okImg, okImg] }),
+  }), {});
+  assert.equal(nokey.status, 503);
+  const data = await nokey.json();
+  assert.equal(data.error, "ki");
+  assert.equal(JSON.stringify(data).includes("aaaa"), false);
 });
 
 test("OCR, KI-Modul und Worker bleiben gültiges JavaScript", () => {
