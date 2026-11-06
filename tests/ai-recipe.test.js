@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { prepFromAi, stepsFromAi, parsedWithAi, deviceGuess, AI_NOTE } from "../js/ai-recipe.js";
+import { prepFromAi, stepsFromAi, parsedWithAi, deviceGuess, AI_NOTE, stripSocial, linkOnlyPaste, nutritionChoice, composeAiNote, aiMarks, LINK_HINT } from "../js/ai-recipe.js";
+import { parseRecipeText } from "../js/ocr-text.js";
+import { estimateRecipe } from "../js/nutrition.js";
 import worker, { corsHeaders } from "../ai-worker/worker.js";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -46,6 +48,45 @@ test("Anleitung braucht Temperatur und Zeit, das Gerät folgt aus dem Namen", ()
   assert.match(AI_NOTE, /KI/);
 });
 
+test("Bildunterschrift verliert Hashtags und Werbung, ein nackter Link wird nicht abgerufen", () => {
+  const caption = [
+    "High Protein Hähnchen aus dem Airfryer 🔥",
+    "200g Hähnchenbrust",
+    "Salz",
+    "Pfeffer",
+    "#reels #highprotein #ad",
+    "Link in Bio für das Gewürz!",
+    "https://www.instagram.com/reel/ABC123/",
+  ].join("\n");
+  assert.equal(linkOnlyPaste("https://www.instagram.com/reel/ABC123/"), true);
+  assert.equal(linkOnlyPaste("https://instagram.com/p/xyz"), true);
+  assert.equal(linkOnlyPaste(caption), false);
+  assert.equal(LINK_HINT.includes("Beschreibung"), true);
+  const cleaned = stripSocial(caption);
+  assert.equal(cleaned.includes("#"), false);
+  assert.equal(/https?:/i.test(cleaned), false);
+  assert.equal(/link in bio/i.test(cleaned), false);
+  assert.equal(/🔥/.test(cleaned), false);
+  const r = parseRecipeText(cleaned);
+  assert.ok(r.z.some(z => /Hähnchenbrust/.test(z)));
+  assert.ok(r.z.some(z => z === "Salz" || /Salz/.test(z)));
+  assert.ok(r.z.some(z => z === "Pfeffer" || /Pfeffer/.test(z)));
+  const local = estimateRecipe(["200 g Reis"], []);
+  assert.ok(local.found > 0);
+  const prefer = nutritionChoice(local, { kcal: 999, eiweiss: 99 });
+  assert.equal(prefer.from, "local");
+  assert.notEqual(prefer.k, "999");
+  const guessed = nutritionChoice({ found: 0, k: 0, p: 0 }, { kcal: 480, eiweiss: 42 });
+  assert.equal(guessed.from, "ki");
+  assert.equal(guessed.k, "480");
+  assert.equal(nutritionChoice({ found: 0, k: 0, p: 0 }, { kcal: 9000 }), null);
+  const marks = aiMarks({ z: [], s: [] }, { z: ["200 g Reis"], s: ["180 °C, 12 min."] });
+  assert.equal(marks.z, true);
+  assert.equal(marks.s, true);
+  assert.equal(composeAiNote("Vom Sonntag.", { steps: marks.s, ingredients: marks.z }), "Vom Sonntag. Anleitung von KI erstellt. Zutatenmengen von KI geschätzt.");
+  assert.equal(composeAiNote("Anleitung von KI erstellt.", { steps: true, ingredients: false }), "Anleitung von KI erstellt.");
+});
+
 test("Worker beantwortet OPTIONS ohne Body und lehnt fremde Origins ab", async () => {
   const headers = corsHeaders("https://danielgergel.github.io");
   const opt = new Response(null, { status: 204, headers });
@@ -80,10 +121,22 @@ test("Worker beantwortet OPTIONS ohne Body und lehnt fremde Origins ab", async (
   const data = await nokey.json();
   assert.equal(data.error, "ki");
   assert.equal(JSON.stringify(data).includes("Salz"), false);
+  const missing = await worker.fetch(new Request("https://kochplaner-ki.example/zutaten", {
+    method: "POST",
+    headers: { Origin: "https://danielgergel.github.io", "content-type": "application/json", "CF-Connecting-IP": "zutat-leer" },
+    body: JSON.stringify({ name: "Pfanne", schritte: [] }),
+  }));
+  assert.equal(missing.status, 400);
+  const zutaten = await worker.fetch(new Request("https://kochplaner-ki.example/zutaten", {
+    method: "POST",
+    headers: { Origin: "https://danielgergel.github.io", "content-type": "application/json", "CF-Connecting-IP": "zutat-key" },
+    body: JSON.stringify({ name: "Hähnchen", schritte: ["Im Airfryer bei 180 °C 12 min garen."] }),
+  }), {});
+  assert.equal(zutaten.status, 503);
 });
 
 test("OCR, KI-Modul und Worker bleiben gültiges JavaScript", () => {
-  for (const file of ["js/ocr-text.js", "js/ocr.js", "js/ai-recipe.js", "js/recipes.js", "ai-worker/worker.js"]) {
+  for (const file of ["js/ocr-text.js", "js/ocr.js", "js/ai-recipe.js", "js/ai-check.js", "js/recipes.js", "ai-worker/worker.js"]) {
     const check = spawnSync(process.execPath, ["--check", file], { cwd: root });
     assert.equal(check.status, 0, file + "\n" + check.stderr);
   }

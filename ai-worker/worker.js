@@ -1,5 +1,5 @@
 /* KI für den Kochplaner. Der Schlüssel GROQ_API_KEY bleibt hier, der Inhalt wird nicht geloggt. */
-import { prepFromAi, stepsFromAi } from "../js/ai-recipe.js";
+import { prepFromAi, stepsFromAi, nutritionChoice } from "../js/ai-check.js";
 
 const ORIGIN = "https://danielgergel.github.io";
 const MODEL = "openai/gpt-oss-120b";
@@ -70,8 +70,9 @@ async function groq(env, messages){
   try { return { json: JSON.parse(text) }; } catch (e) { return { error: "parse" }; }
 }
 
-const PREP_SYS = "Du strukturierst einen OCR-Rohtext eines Kochrezepts. Antworte nur mit JSON dieser Form: {\"name\":\"\",\"portionen\":2,\"zutaten\":[{\"menge\":\"200\",\"einheit\":\"g\",\"zutat\":\"Hähnchenbrust\"}],\"schritte\":[]}. Menge und Einheit leer lassen, wenn keine Menge dasteht. Schritte nur übernehmen, wenn sie im Text stehen, sonst ein leeres Array. Nichts erfinden. Deutsch und kurz.";
+const PREP_SYS = "Du strukturierst einen Rezepttext, oft aus einem Screenshot oder einer Instagram-Beschreibung. Antworte nur mit JSON: {\"name\":\"\",\"portionen\":2,\"zutaten\":[{\"menge\":\"200\",\"einheit\":\"g\",\"zutat\":\"Hähnchenbrust\"}],\"schritte\":[],\"kcal\":0,\"eiweiss\":0}. Hashtags, Emojis, Links, „Link in Bio“, Werbung und Rabattcodes ignorieren. Menge und Einheit leer lassen, wenn keine Menge dasteht. Schritte nur übernehmen, wenn sie im Text stehen, sonst ein leeres Array. Nichts erfinden. kcal und eiweiss nur schätzen, wenn der Text sie nicht nennt, sonst die genannten Zahlen, jeweils pro Person, sonst null. Deutsch und kurz.";
 const STEP_SYS = "Du schreibst eine kurze, praxisnahe Zubereitung auf Deutsch für jemanden, der viel High-Protein kocht und oft den Airfryer nutzt. Antworte nur mit JSON: {\"schritte\":[\"...\"]}. Vier bis acht Schritte, jeder ein Satz. Nenne konkrete Temperaturen und Zeiten. Ofen: Grad Celsius und Ober-/Unterhitze oder Umluft. Airfryer: Grad Celsius und Minuten. Pfanne: Stufe und Minuten. Keine Einleitung und keine Nährwerte.";
+const ING_SYS = "Du leitest aus einer Zubereitung eine Zutatenliste für 2 Personen ab. Antworte nur mit JSON: {\"name\":\"\",\"portionen\":2,\"zutaten\":[{\"menge\":\"200\",\"einheit\":\"g\",\"zutat\":\"Hähnchenbrust\"}],\"kcal\":0,\"eiweiss\":0}. Typische Mengen aus dem deutschen Supermarkt, bei Fleisch und Skyr eher eiweißreich. Keine Schritte erfinden. kcal und eiweiss sind Schätzwerte pro Person oder null, wenn du sie nicht sinnvoll schätzen kannst.";
 
 export default {
   async fetch(request, env){
@@ -82,7 +83,7 @@ export default {
     if (request.method !== "POST") return json({ error: "method" }, 405, origin);
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
-    if (path !== "/aufbereiten" && path !== "/anleitung") return json({ error: "path" }, 404, origin);
+    if (path !== "/aufbereiten" && path !== "/anleitung" && path !== "/zutaten") return json({ error: "path" }, 404, origin);
     const ip = request.headers.get("CF-Connecting-IP") || "local";
     if (limited(ip)) return json({ error: "rate" }, 429, origin);
     const len = Number(request.headers.get("content-length") || 0);
@@ -102,6 +103,15 @@ export default {
         { role: "system", content: PREP_SYS },
         { role: "user", content: text },
       ];
+    } else if (path === "/zutaten") {
+      const name = typeof body.name === "string" ? body.name.trim().slice(0, 80) : "";
+      const schritte = Array.isArray(body.schritte) ? body.schritte.map(x => String(x || "").trim()).filter(Boolean).slice(0, 20) : [];
+      const packed = schritte.join("\n");
+      if (!schritte.length || packed.length > MAX_TEXT) return json({ error: "input" }, 400, origin);
+      messages = [
+        { role: "system", content: ING_SYS },
+        { role: "user", content: "Rezept: " + (name || "Unbekannt") + "\nZubereitung:\n" + packed },
+      ];
     } else {
       const name = typeof body.name === "string" ? body.name.trim().slice(0, 80) : "";
       const zutaten = Array.isArray(body.zutaten) ? body.zutaten.map(x => String(x || "").trim()).filter(Boolean).slice(0, 40) : [];
@@ -120,10 +130,21 @@ export default {
       const status = out && out.error === "nokey" ? 503 : 502;
       return json({ error: "ki" }, status, origin);
     }
-    if (path === "/aufbereiten") {
+    if (path === "/aufbereiten" || path === "/zutaten") {
       const clean = prepFromAi(out.json);
       if (!clean) return json({ error: "schema" }, 422, origin);
-      return json({ name: clean.n, portionen: clean.portions || null, zutaten: clean.z.map(line => splitLine(line)), schritte: clean.s }, 200, origin);
+      const nut = nutritionChoice(null, out.json);
+      const payload = {
+        name: clean.n,
+        portionen: clean.portions || 2,
+        zutaten: clean.z.map(line => splitLine(line)),
+        schritte: path === "/zutaten" ? [] : clean.s,
+      };
+      if (nut && nut.from === "ki") {
+        if (nut.k) payload.kcal = Number(nut.k);
+        if (nut.p) payload.eiweiss = Number(nut.p);
+      }
+      return json(payload, 200, origin);
     }
     const steps = stepsFromAi(out.json);
     if (!steps) return json({ error: "schema" }, 422, origin);

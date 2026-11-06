@@ -16,6 +16,7 @@ const CORE = [
   "js/ocr-text.js",
   "js/ocr.js",
   "js/ai-recipe.js",
+  "js/ai-check.js",
   "js/recipe-badge.js",
   "js/diet.js",
   "js/share.js",

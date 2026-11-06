@@ -99,6 +99,7 @@ h1{font-family:var(--f-disp);font-weight:700;font-size:30px;letter-spacing:.01em
 .stp[aria-checked="true"] .n{background:var(--accent);color:var(--accent-fg)}
 .stp[aria-checked="true"] .t{color:var(--muted);text-decoration:line-through}
 .dn{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:8px;padding:10px 12px;margin-top:14px;font-size:14.5px}
+.kitag{display:inline-block;margin-left:6px;padding:0 5px;border:1px solid var(--line);border-radius:8px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.04em;vertical-align:1px}
 .drow{display:flex;gap:8px;margin-top:14px}
 .drow .btn{flex:1}
 .recline{display:flex;gap:8px;margin:0 0 14px}
