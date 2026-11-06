@@ -6,7 +6,7 @@ import { estimateRecipe } from "./nutrition.js";
 import { NSVIDEO } from "./data/wake.js";
 import { showPanel, hidePanel, closePanel, setDiceTimer, clearDiceTimer } from "./panels.js";
 import { diceResult, setDiceResult, openFromPanel, takeBehind } from "./panel-return.js";
-import { deviceGuess, aiOnline, AI_NOTE, adoptRecipeText, fetchSteps } from "./ai-recipe.js";
+import { deviceGuess, aiOnline, adoptRecipeText, fetchSteps, fetchIngredients, nutritionChoice, composeAiNote } from "./ai-recipe.js";
 import { badgeOf, idNumber, recipeRank, clearSearchCache } from "./recipe-badge.js";
 
 let shareHook = () => {};
@@ -346,21 +346,24 @@ export function crHtml(id){
    <label class="full">Name<input id="cr-n" value="${esc(r ? r.n : "")}" placeholder="z. B. Hähnchen-Reis-Pfanne"></label>
    <label class="full">Art<select id="cr-g">${Object.keys(CGRP).map(x => `<option${x === g ? " selected" : ""}>${x}</option>`).join("")}</select></label>
    <label class="full">Ernährung<select id="cr-d"><option value=""${!manual ? " selected" : ""}>Automatisch erkennen</option><option value="vegetarisch"${manual === "vegetarisch" ? " selected" : ""}>Vegetarisch</option><option value="fleisch"${manual === "fleisch" ? " selected" : ""}>Mit Fleisch oder Fisch</option></select></label>
-   <label>kcal pro Person<input id="cr-k" inputmode="numeric" value="${r ? r.k : ""}" placeholder="automatisch"></label>
+   <label>kcal pro Person <span class="kitag" id="cr-kki" hidden>KI</span><input id="cr-k" inputmode="numeric" value="${r ? r.k : ""}" placeholder="automatisch"></label>
    <label>Eiweiß (g)<input id="cr-p" inputmode="numeric" value="${r ? r.p : ""}" placeholder="automatisch"></label>
    <label class="full">Zeit<input id="cr-t" value="${esc(r ? r.t : "")}" placeholder="automatisch"></label>
-   <label class="full">Zutaten, eine pro Zeile<textarea id="cr-z" placeholder="400 g Hähnchenbrust&#10;200 g Reis (roh)&#10;1 Paprika&#10;Salz, Pfeffer">${esc(r ? r.z.join("\n") : "")}</textarea></label>
-   <label class="full">Zubereitung, ein Schritt pro Zeile<textarea id="cr-s" placeholder="Reis kochen.&#10;Hähnchen würfeln und anbraten.">${esc(r ? r.s.join("\n") : "")}</textarea></label>
+   <label class="full">Zutaten, eine pro Zeile <span class="kitag" id="cr-zki" hidden>KI</span><textarea id="cr-z" placeholder="400 g Hähnchenbrust&#10;200 g Reis (roh)&#10;1 Paprika&#10;Salz, Pfeffer">${esc(r ? r.z.join("\n") : "")}</textarea></label>
+   <label class="full">Zubereitung, ein Schritt pro Zeile <span class="kitag" id="cr-ski" hidden>KI</span><textarea id="cr-s" placeholder="Reis kochen.&#10;Hähnchen würfeln und anbraten.">${esc(r ? r.s.join("\n") : "")}</textarea></label>
    <label class="full">Gerät<select id="cr-dev"><option>Airfryer</option><option>Ofen</option><option>Pfanne</option></select></label>
    <button class="btn" type="button" data-crai id="cr-ai">Anleitung erstellen</button>
+   <button class="btn" type="button" data-craiz id="cr-aiz">Zutaten schätzen</button>
    <p class="note" id="cr-aihint" style="margin:0"></p>
   </div>
   <div class="stack"><button class="btn" data-crcalc>Kalorien, Eiweiß und Zeit berechnen</button><p class="note" id="crhint" style="margin:0">Nur ungefähre Werte. Lässt du die Felder leer, rechnet die App beim Speichern selbst.</p><button class="btn pri" data-crsave="${id || ""}">Speichern</button></div></div>`;
 }
-let aiMade = false;
+let aiSteps = false;
+let aiZutaten = false;
 export function openCr(id){
   ui.pm = "C";
-  aiMade = false;
+  aiSteps = false;
+  aiZutaten = false;
   showPanel(crHtml(id || ""));
   const rec = id ? catalog.all[id] : null;
   const dev = $("#cr-dev");
@@ -369,12 +372,15 @@ export function openCr(id){
 }
 function paintAi(){
   const on = aiOnline();
-  const btn = $("#cr-ai");
   const hint = $("#cr-aihint");
-  if (btn) btn.disabled = !on;
+  ["#cr-ai", "#cr-aiz"].forEach(id => { const b = $(id); if (b) b.disabled = !on; });
   if (hint) hint.textContent = on
-    ? "Die Schritte landen im Feld und lassen sich ändern."
-    : "Ohne Internet bleibt der Knopf aus. Trag die Schritte selbst ein.";
+    ? "Ergänztes steht mit KI am Feld. Bitte vor dem Speichern prüfen."
+    : "Ohne Internet bleiben die Knöpfe aus. Trag Zutaten und Schritte selbst ein.";
+}
+function markAi(id, on){
+  const el = $("#" + id);
+  if (el) el.hidden = !on;
 }
 function crLines(id){
   return ($(id) || { value:"" }).value.split("\n").map(x => x.trim()).filter(Boolean);
@@ -411,7 +417,7 @@ export function saveCr(id){
     if (base.pt) rec.pt = base.pt;
     if (base.w) rec.w = base.w;
     ["note","q","u","mp"].forEach(k => { if (base[k]) rec[k] = base[k]; });
-    if (aiMade && s.length) rec.note = noteWithAi(rec.note);
+    if (aiSteps || aiZutaten) rec.note = composeAiNote(rec.note, { steps: aiSteps && s.length, ingredients: aiZutaten && z.length });
     if (!ST.ov || typeof ST.ov !== "object" || Array.isArray(ST.ov)) ST.ov = {};
     if (sameAsBase(base, rec)) delete ST.ov[id];
     else ST.ov[id] = rec;
@@ -419,7 +425,7 @@ export function saveCr(id){
     rec.ns = true;
     rec.pt = "für 2 Personen";
     rec.cust = 1;
-    if (aiMade && s.length) rec.note = noteWithAi("");
+    if (aiSteps || aiZutaten) rec.note = composeAiNote("", { steps: aiSteps && s.length, ingredients: aiZutaten && z.length });
     const i = ST.cust.findIndex(c => c.id === rec.id);
     if (i >= 0) ST.cust[i] = rec; else ST.cust.push(rec);
   }
@@ -434,11 +440,6 @@ export function saveCr(id){
   if (ui.openId) redrawDetail();
   toast("Rezept gespeichert");
   shareHook(rec.id, "save");
-}
-function noteWithAi(prev){
-  const text = String(prev || "").trim();
-  if (text.includes(AI_NOTE.replace(/\.$/, ""))) return text.endsWith(".") ? text : text + ".";
-  return text ? text + " " + AI_NOTE : AI_NOTE;
 }
 function sameAsBase(base, rec){
   const sameList = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
@@ -469,12 +470,28 @@ export function applyParsed(r){
   if (r.z.length && (!r.k || !r.p || !r.t)) {
     try {
       const e = estimateRecipe(r.z, r.s);
-      if (!r.k) setField("#cr-k", e.k);
-      if (!r.p) setField("#cr-p", e.p);
-      if (!r.t) setField("#cr-t", e.t);
-      note += " Fehlende kcal, Eiweiß und Zeit sind ungefähr aus den Zutaten berechnet.";
+      if (e.found > 0) {
+        if (!r.k) setField("#cr-k", e.k);
+        if (!r.p) setField("#cr-p", e.p);
+        if (!r.t) setField("#cr-t", e.t);
+        note += " Fehlende kcal, Eiweiß und Zeit sind ungefähr aus den Zutaten berechnet.";
+      } else {
+        const nut = nutritionChoice(e, r.macros);
+        if (nut && nut.from === "ki") {
+          if (!r.k && nut.k) setField("#cr-k", nut.k);
+          if (!r.p && nut.p) setField("#cr-p", nut.p);
+          r.ai = Object.assign({}, r.ai, { k: true });
+          note += " kcal und Eiweiß sind eine Schätzung der KI.";
+        }
+      }
     } catch (e) {}
   }
+  const ai = r.ai || {};
+  markAi("cr-zki", !!(ai.z && r.z.length));
+  markAi("cr-ski", !!(ai.s && r.s.length));
+  markAi("cr-kki", !!(ai.k));
+  if (ai.z && r.z.length) aiZutaten = true;
+  if (ai.s && r.s.length) aiSteps = true;
   const h = $("#crimpst");
   if (h) h.textContent = note;
 }
@@ -486,12 +503,14 @@ export function showOcrReview(parsed, extraDropped){
   const box = $("#cr-review");
   if (!box) { applyParsed(parsed); return; }
   const line = (kind, text, on) => `<label class="revline"><input type="checkbox" data-rev="${kind}" ${on ? "checked" : ""}><input type="text" value="${esc(text)}"></label>`;
+  const ki = on => on ? ` <span class="kitag">KI</span>` : "";
+  const marks = parsed.ai || {};
   box.hidden = false;
   box.innerHTML = `<p class="note" style="margin:8px 0">Prüfe die erkannten Zeilen. Nimm den Haken weg, wenn etwas nicht ins Rezept gehört. Den Text kannst du noch ändern.</p>
     <label class="full" style="display:block;font-size:13px;color:var(--muted);font-weight:600">Name<input id="cr-rev-n" value="${esc(parsed.n || "")}" style="width:100%;min-height:44px;margin-top:4px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:500 16px inherit;padding:8px 10px"></label>
-    <h3 class="sec">Erkannte Zutaten</h3>
+    <h3 class="sec">Erkannte Zutaten${ki(marks.z)}</h3>
     <div id="cr-rev-z">${parsed.z.length ? parsed.z.map(t => line("z", t, true)).join("") : '<p class="empty">Keine Zutat erkannt.</p>'}</div>
-    <h3 class="sec">Erkannte Schritte</h3>
+    <h3 class="sec">Erkannte Schritte${ki(marks.s)}</h3>
     <div id="cr-rev-s">${parsed.s.length ? parsed.s.map(t => line("s", t, true)).join("") : '<p class="empty">Keine Schritte erkannt.</p>'}</div>
     ${dropped.length ? `<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">Weggelassen (${dropped.length})</summary><div id="cr-rev-d">${dropped.map(t => line("d", t, false)).join("")}</div></details>` : ""}
     <button class="btn pri" data-crrev style="width:100%;margin-top:10px">In das Formular übernehmen</button>`;
@@ -509,7 +528,7 @@ export function applyReview(){
   const extra = checkedLines($("#cr-rev-d"));
   extra.forEach(l => { if (/^(\d|½|¼|¾|ein |eine )/i.test(l)) z.push(l); else s.push(l); });
   const base = reviewLines || {};
-  applyParsed({ n:name.trim(), z, s, t:base.t || "", k:base.k || "", p:base.p || "", portions:base.portions || 0, dropped:[] });
+  applyParsed({ n:name.trim(), z, s, t:base.t || "", k:base.k || "", p:base.p || "", portions:base.portions || 0, dropped:[], ai: base.ai, macros: base.macros });
   const box = $("#cr-review");
   if (box) box.hidden = true;
 }
@@ -623,7 +642,8 @@ export function bindRecipeDom(){
       const raw = $("#cr-raw");
       if (!raw || !raw.value.trim()) { toast("Bitte erst Text einfügen"); return; }
       adoptRecipeText(raw.value).then(parsed => {
-        if (parsed.dropped.length) showOcrReview(parsed);
+        if (parsed.linkOnly) { toast(parsed.hint); return; }
+        if (parsed.dropped && parsed.dropped.length) showOcrReview(parsed);
         else applyParsed(parsed);
       });
       return;
@@ -633,13 +653,39 @@ export function bindRecipeDom(){
       const btn = $("#cr-ai");
       if (btn) btn.disabled = true;
       const name = ($("#cr-n") || { value:"" }).value;
-      fetchSteps(name, crLines("#cr-z"), ($("#cr-dev") || { value:"" }).value).then(steps => {
+      const z = crLines("#cr-z");
+      if (!z.length) { paintAi(); toast("Trag zuerst die Zutaten ein"); return; }
+      fetchSteps(name, z, ($("#cr-dev") || { value:"" }).value).then(steps => {
         paintAi();
         if (!steps) { toast("Anleitung gerade nicht möglich"); return; }
         const area = $("#cr-s");
         if (area) area.value = steps.join("\n");
-        aiMade = true;
+        aiSteps = true;
+        markAi("cr-ski", true);
         toast("Schritte eingesetzt, bitte prüfen");
+      });
+      return;
+    }
+    if (d.craiz !== undefined) {
+      if (!aiOnline()) { paintAi(); toast("Ohne Internet keine Schätzung"); return; }
+      const steps = crLines("#cr-s");
+      if (!steps.length) { toast("Trag zuerst die Zubereitung ein"); return; }
+      const btn = $("#cr-aiz");
+      if (btn) btn.disabled = true;
+      const name = ($("#cr-n") || { value:"" }).value;
+      fetchIngredients(name, steps).then(ing => {
+        paintAi();
+        if (!ing || !ing.z.length) { toast("Zutaten gerade nicht möglich"); return; }
+        const area = $("#cr-z");
+        if (area) area.value = ing.z.join("\n");
+        aiZutaten = true;
+        markAi("cr-zki", true);
+        const nut = nutritionChoice(estimateRecipe(ing.z, steps), ing);
+        const kE = $("#cr-k"), pE = $("#cr-p");
+        if (nut && kE && !String(kE.value || "").trim()) kE.value = nut.k;
+        if (nut && pE && !String(pE.value || "").trim()) pE.value = nut.p;
+        if (nut && nut.from === "ki") markAi("cr-kki", true);
+        toast("Zutaten eingesetzt, bitte prüfen");
       });
       return;
     }

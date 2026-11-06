@@ -1,4 +1,6 @@
-name = "kochplaner-ki"
+# Diesen Namen ruft die App auf (js/ai-recipe.js). Nicht auf kochplaner-ki umbenennen,
+# sonst landet /zutaten auf einem anderen Worker.
+name = "still-resonance-82a6"
 main = "worker.js"
 compatibility_date = "2026-10-01"
 workers_dev = true
