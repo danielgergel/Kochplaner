@@ -67,9 +67,10 @@ test("Tagebuch: Schnelleintrag steht oben, Wochenbilanz ganz unten", () => {
   const src = fs.readFileSync(path.join(import.meta.dirname, "../js/diary.js"), "utf8");
   const html = src.slice(src.indexOf("export function dyHtml"), src.indexOf("export function drawDy"));
   const quick = html.indexOf("Schnell eintragen");
+  const meal = html.indexOf("Mahlzeit");
   const eaten = html.indexOf("Gegessen");
   const foods = html.indexOf("${foods}");
   const chart = html.indexOf("${weekChartHtml()}");
-  assert.ok(quick > 0 && eaten > quick && foods > eaten && chart > foods);
+  assert.ok(quick > 0 && meal > quick && eaten > meal && foods > eaten && chart > foods);
   assert.equal(html.indexOf("${weekChartHtml()}"), html.lastIndexOf("${weekChartHtml()}"));
 });
