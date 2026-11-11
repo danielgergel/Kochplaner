@@ -282,12 +282,12 @@ export function dyHtml(){
   <div class="dnav"><button data-dyd="-1" aria-label="Vorheriger Tag">‹</button><b>${dlabel(ui.dyk)}</b><button data-dyd="1" aria-label="Nächster Tag">›</button></div>
   <div class="tot"><div><div class="row1"><b>${Math.round(t.k)} kcal</b><span>Ziel ${G.k} · noch ${Math.round(G.k - t.k)}</span></div>${barHtml(t.k, G.k)}</div>
    <div><div class="row1"><b>${f1(t.p)} g Eiweiß</b><span>Ziel ${G.p} · noch ${f1(G.p - t.p)}</span></div>${barHtml(t.p, G.p, true)}</div></div>
-  <h3 class="sec">Mahlzeit</h3>
-  ${mealBlockHtml()}
   <h3 class="sec">Schnell eintragen</h3>
   <input id="qk" class="finp" placeholder="z. B. 4 Kaffee, 2 Brötchen mit Butter, Pommes" autocomplete="off" autocapitalize="none" aria-label="Was hast du gegessen oder getrunken?">
   <div id="qkp">${qHtml()}</div>
   <div class="stack"><button class="btn" data-scan>Barcode scannen</button></div>
+  <h3 class="sec">Mahlzeit</h3>
+  ${mealBlockHtml()}
   ${undo}
   <h3 class="sec">Gegessen</h3>
   ${eaten}
