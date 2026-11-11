@@ -1,8 +1,10 @@
-import { catalog, DY, ST, ui, dsave, persist } from "./state.js";
+import { catalog, DY, ST, ui, dsave, persist, storage } from "./state.js";
 import { $, esc, toast, f1, dkey, dlabel, WDSHORT } from "./util.js";
 import { grp } from "./recipes.js";
 import { badgeOf, haystack } from "./recipe-badge.js";
 import { parsePiece, calcPiece, isDrink, unitCaption } from "./nutrition.js";
+import { aiOnline, fetchDishes } from "./ai-recipe.js";
+import { normDish, recallDishes, rememberDishes, resizeDish, dishLabel, dishEntry } from "./dish-ai.js";
 import { showPanel } from "./panels.js";
 import { mealBlockHtml, bindMeal } from "./meal-ui.js";
 
@@ -75,6 +77,7 @@ export function mergeDayEntries(local, incoming){
     }
     if (!have.rid && e.rid) have.rid = e.rid;
     if (!have.gk && e.gk) have.gk = 1;
+    if (!have.est && e.est) have.est = 1;
   }
   return out;
 }
@@ -101,23 +104,74 @@ function barHtml(v, g, min){
 }
 
 let QP = [];
+let dishTimer = 0;
+let dishGen = 0;
+let dishQ = "";
+let dishList = [];
+let dishPick = null;
+function dishIndex(){
+  for (let i = QP.length - 1; i >= 0; i--) if ((QP[i].q || "").trim().length >= 3) return i;
+  return -1;
+}
+function dishBlock(i){
+  if (dishIndex() !== i) return "";
+  const chosen = dishPick && dishPick.i === i ? dishPick.dish : null;
+  const chips = dishList.map((d, j) => `<button type="button" class="chipb" data-qdish="${i}:${j}" aria-pressed="${dishPick && dishPick.j === j ? "true" : "false"}">${esc(d.name)} · Portion (${d.g} g) · ~${d.k} kcal</button>`).join("");
+  const picked = chosen ? `<p class="note" style="margin:6px 0 0">geschätzt, ${esc(dishLabel(chosen))}</p><div class="frm"><label>kcal<input data-qkcal="${i}" inputmode="decimal" value="${chosen.k}" aria-label="Geschätzte kcal"></label><label>Eiweiß (g)<input data-qprot="${i}" inputmode="decimal" value="${chosen.p}" aria-label="Geschätztes Eiweiß in Gramm"></label></div><div class="alts"><button type="button" class="chipb" data-qsize="${i}:-50" aria-label="Kleinere Portion">−50 g</button><button type="button" class="chipb" data-qsize="${i}:50" aria-label="Größere Portion">+50 g</button></div>` : "";
+  return (chips ? `<div class="alts">Vorschlag: ${chips}</div>` : "") + picked;
+}
+function paintQuick(){
+  const box = $("#qkp");
+  if (box) box.innerHTML = qHtml();
+}
+function queueDishes(){
+  const i = dishIndex();
+  const raw = i < 0 ? "" : (QP[i].q || "").trim();
+  const key = normDish(raw);
+  if (key !== dishQ) { dishQ = key; dishList = []; dishPick = null; }
+  clearTimeout(dishTimer);
+  paintQuick();
+  if (key.length < 3) return;
+  const cached = recallDishes(storage, raw);
+  if (cached) { dishList = cached; paintQuick(); return; }
+  if (!aiOnline()) return;
+  const gen = ++dishGen;
+  dishTimer = setTimeout(async () => {
+    const list = await fetchDishes(raw);
+    if (gen !== dishGen || normDish(raw) !== dishQ) return;
+    if (!list) return;
+    rememberDishes(storage, raw, list);
+    dishList = list;
+    paintQuick();
+  }, 600);
+}
 function qParse(text){
   QP = text.replace(/(\d),(\d)/g, "$1§$2").split(/\s*(?:,|\+|&|\bund\b|\bplus\b|\bmit\b)\s*/i).map(p => parsePiece(p.replace(/§/g, ","))).filter(Boolean);
 }
+function quickTotals(){
+  let tk = 0, tp = 0, ok = 0;
+  QP.forEach((pc, i) => {
+    const picked = dishPick && dishPick.i === i ? dishPick.dish : null;
+    const c = picked ? null : calcPiece(pc);
+    if (picked) { ok++; tk += picked.k; tp += picked.p; }
+    else if (c) { ok++; tk += c.k; tp += c.p; }
+  });
+  return { tk, tp, ok };
+}
 function qHtml(){
   if (!QP.length) return "";
-  let tk = 0, tp = 0, ok = 0;
   const rows = QP.map((pc, i) => {
     const c = calcPiece(pc);
-    if (!c) return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(pc.raw)}</b><span class="meta">Nicht gefunden. Trag Kalorien und Eiweiß unten selbst ein oder scanne den Barcode.</span></div>`;
-    ok++; tk += c.k; tp += c.p;
+    if (!c) return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(pc.raw)}</b><span class="meta">Nicht gefunden. Trag Kalorien und Eiweiß unten selbst ein oder scanne den Barcode.</span>${dishBlock(i)}</div>`;
     const alts = pc.foods.map((f, j) => j === pc.fi ? "" : `<button class="chipb" data-qalt="${i}:${j}">${esc(f.n)}</button>`).join("");
     const drink = isDrink(c.f);
     const units = (c.f._u || []).filter(u => u[2] !== "g" && u[2] !== "ml" && u[2] !== c.unitName);
     const uchips = units.length ? units.map(u => `<button class="chipb" data-qunit="${i}:${esc(u[2])}">${esc(unitCaption(u[2], u[1], drink))}</button>`).join("") : "";
-    return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(c.f.n)} · ${esc(c.label)}</b><span class="meta">${Math.round(c.k)} kcal · ${f1(c.p)} g Eiweiß</span>${uchips ? `<div class="alts">Einheit: ${uchips}</div>` : ""}${alts ? `<div class="alts">Meintest du: ${alts}</div>` : ""}</div>`;
+    return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(c.f.n)} · ${esc(c.label)}</b><span class="meta">${Math.round(c.k)} kcal · ${f1(c.p)} g Eiweiß</span>${uchips ? `<div class="alts">Einheit: ${uchips}</div>` : ""}${alts ? `<div class="alts">Meintest du: ${alts}</div>` : ""}${dishBlock(i)}</div>`;
   }).join("");
-  return `<div class="box" style="margin-top:6px">${rows}</div>` + (ok ? `<button class="btn pri" data-qadd style="width:100%;margin-top:8px">Eintragen: ${Math.round(tk)} kcal · ${f1(tp)} g Eiweiß</button>` : "");
+  const sum = quickTotals();
+  const mark = dishPick ? "~" : "";
+  return `<div class="box" style="margin-top:6px">${rows}</div>` + (sum.ok ? `<button class="btn pri" data-qadd style="width:100%;margin-top:8px">Eintragen: ${mark}${Math.round(sum.tk)} kcal · ${mark}${f1(sum.tp)} g Eiweiß</button>` : "");
 }
 
 function suggestHtml(){
@@ -253,7 +307,8 @@ function eatenHtml(ents){
   if (!ents.length) return '<p class="empty">An diesem Tag ist noch nichts eingetragen.</p>';
   const index = recipeLinkIndex(catalog.ALL);
   return `<div class="box">` + ents.map((e, i) => {
-    const meta = `${Math.round(e.k * e.m)} kcal · ${f1(e.p * e.m)} g Eiweiß`;
+    const tilde = e.est ? "~" : "";
+    const meta = `${tilde}${Math.round(e.k * e.m)} kcal · ${tilde}${f1(e.p * e.m)} g Eiweiß`;
     const controls = `<div class="eac"><button data-dym="${i}:-0.5" aria-label="Weniger">−</button><span>${f1(e.m)}×</span><button data-dym="${i}:0.5" aria-label="Mehr">+</button><button data-dyx="${i}" aria-label="Löschen">×</button></div>`;
     const id = entryRecipeId(e, index);
     if (!id) return `<div class="ent"><b>${esc(e.n)}</b><span class="meta">${meta}</span>${controls}</div>`;
@@ -264,6 +319,10 @@ function eatenHtml(ents){
 
 export function drawDy(keep){
   QP = [];
+  clearTimeout(dishTimer);
+  dishQ = "";
+  dishList = [];
+  dishPick = null;
   const pnl = $("#pnl");
   const y = pnl.scrollTop;
   pnl.innerHTML = dyHtml();
@@ -292,7 +351,23 @@ export function bindDiary(){
       const v = parseInt(ev.target.value, 10) || 0;
       if (v > 0) { if (ev.target.id === "dg-k") DY.goal.k = v; else DY.goal.p = v; dsave(); }
     }
-    if (ev.target.id === "qk") { qParse(ev.target.value); const box = $("#qkp"); if (box) box.innerHTML = qHtml(); }
+    if (ev.target.id === "qk") { qParse(ev.target.value); queueDishes(); }
+    if (dishPick && (ev.target.dataset.qkcal !== undefined || ev.target.dataset.qprot !== undefined)) {
+      const n = parseFloat(String(ev.target.value).replace(",", "."));
+      const kcal = ev.target.dataset.qkcal !== undefined;
+      const max = kcal ? 2500 : 200;
+      if (Number.isFinite(n) && n >= 0 && n <= max) {
+        const d = dishPick.dish;
+        const scaled = d.g > 0 ? d.g0 / d.g : 1;
+        if (kcal) { d.k = Math.round(n); d.k0 = Math.round(d.k * scaled); }
+        else { d.p = Math.round(n * 10) / 10; d.p0 = Math.round(d.p * scaled * 10) / 10; }
+        const btn = document.querySelector("[data-qadd]");
+        if (btn) {
+          const sum = quickTotals();
+          btn.textContent = "Eintragen: ~" + Math.round(sum.tk) + " kcal · ~" + f1(sum.tp) + " g Eiweiß";
+        }
+      }
+    }
   });
   document.addEventListener("change", ev => {
     if (ev.target.id === "dg-k" || ev.target.id === "dg-p") drawDy(true);
@@ -379,17 +454,35 @@ export function bindDiary(){
       }
       if (d.dyf !== undefined) { const f = DY.foods[+d.dyf]; addEntry({ n:f.n, k:f.k, p:f.p }); drawDy(true); toast("Eingetragen"); return; }
       if (d.dyfx !== undefined) { DY.foods.splice(+d.dyfx, 1); dsave(); drawDy(true); return; }
-      if (d.qalt) { const [i, j] = d.qalt.split(":").map(Number); QP[i].fi = j; delete QP[i].unitForce; $("#qkp").innerHTML = qHtml(); return; }
+      if (d.qalt) { const [i, j] = d.qalt.split(":").map(Number); QP[i].fi = j; delete QP[i].unitForce; dishPick = null; $("#qkp").innerHTML = qHtml(); return; }
       if (d.qunit) {
         const cut = d.qunit.indexOf(":");
         const i = Number(d.qunit.slice(0, cut));
         if (QP[i]) QP[i].unitForce = d.qunit.slice(cut + 1);
+        dishPick = null;
         $("#qkp").innerHTML = qHtml();
+        return;
+      }
+      if (d.qdish) {
+        const [i, j] = d.qdish.split(":").map(Number);
+        const picked = dishList[j];
+        if (picked) dishPick = { i, j, dish: Object.assign({}, picked) };
+        paintQuick();
+        return;
+      }
+      if (d.qsize && dishPick) {
+        const [i, delta] = d.qsize.split(":").map(Number);
+        if (dishPick.i === i) dishPick.dish = resizeDish(dishPick.dish, dishPick.dish.g + delta);
+        paintQuick();
         return;
       }
       if (d.qadd !== undefined) {
         let n = 0;
-        QP.forEach(pc => { const c = calcPiece(pc); if (c) { addEntry({ n:c.f.n + " (" + c.label + ")", k:c.k, p:c.p }); n++; } });
+        QP.forEach((pc, i) => {
+          if (dishPick && dishPick.i === i) { addEntry(dishEntry(dishPick.dish)); n++; return; }
+          const c = calcPiece(pc);
+          if (c) { addEntry({ n:c.f.n + " (" + c.label + ")", k:c.k, p:c.p }); n++; }
+        });
         QP = [];
         drawDy(true);
         toast(n + " Eintrag" + (n > 1 ? "e" : "") + " gespeichert");

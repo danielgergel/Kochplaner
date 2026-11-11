@@ -1,5 +1,5 @@
 /* Service Worker für den Kochplaner: App, Schriften und Bibliotheken liegen im Zwischenspeicher, damit sie ohne Internet starten. */
-const V = "kochplaner-v29";
+const V = "kochplaner-v30";
 const CORE = [
   "./",
   "index.html",
@@ -29,6 +29,7 @@ const CORE = [
   "js/meal-ui.js",
   "js/product.js",
   "js/diary.js",
+  "js/dish-ai.js",
   "js/scanner.js",
   "js/sync.js",
   "js/backup.js",

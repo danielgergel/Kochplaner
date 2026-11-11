@@ -320,6 +320,7 @@ export function sanitizeEntry(e){
   const out = { n, k, p, m };
   if (typeof e.rid === "string" && ID_RE.test(e.rid)) out.rid = e.rid;
   if (e.gk) out.gk = 1;
+  if (e.est) out.est = 1;
   return out;
 }
 
