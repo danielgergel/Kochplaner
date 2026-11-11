@@ -170,7 +170,7 @@ export async function fetchDishes(text){
   const q = String(text || "").trim().slice(0, 80);
   if (q.length < 3) return null;
   const remote = await postAi("/vorschlaege", { text: q });
-  return dishesFromAi(remote);
+  return dishesFromAi(remote, q);
 }
 
 export async function fetchMeal(text, known){
