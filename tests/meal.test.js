@@ -97,6 +97,11 @@ test("Tippfehler und zusammengesetzte Wörter werden toleriert", () => {
   assert.match(first("Haehnchenaufschnit").n, /Aufschnitt/);
   assert.match(first("Vollkornbrott").n, /Vollkornbrot/);
   assert.match(first("Mozzarela").n, /Mozzarella/);
+  assert.match(first("hänchen").n, /Hähnchen/);
+  assert.match(first("Banane").n, /Banane/i);
+  assert.match(first("Reis").n, /Reis/);
+  assert.match(first("Ei").n, /Ei/);
+  assert.match(first("Brot").n, /brot/i);
 });
 
 test("nicht erkannte Teile landen in unknown", () => {

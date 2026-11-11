@@ -17,30 +17,70 @@ function isCuisine(token){
   return CUISINE.some(s => token === s || (token.startsWith(s) && token.length <= s.length + 3));
 }
 
-/* Der Name muss die eingegebene Speise enthalten. Küchenarten wie „türkisch“ zählen nicht als Speise. */
+function lev(a, b){
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > 2) return 3;
+  const prev = new Array(b.length + 1);
+  const cur = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    cur[0] = i;
+    let low = cur[0];
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      if (cur[j] < low) low = cur[j];
+    }
+    if (low > 2) return 3;
+    for (let j = 0; j <= b.length; j++) prev[j] = cur[j];
+  }
+  return prev[b.length];
+}
+
+/* Tippfehler und fehlende Buchstaben: „haenchen“ trifft „haehnchen“ und „haehnchenbrust“. */
+function closeWord(a, b){
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.length >= 4 && b.length >= 4 && (a.includes(b) || b.includes(a))) return true;
+  const lim = Math.max(a.length, b.length) >= 10 ? 2 : (Math.min(a.length, b.length) >= 5 ? 1 : 0);
+  if (lim && Math.abs(a.length - b.length) <= lim && lev(a, b) <= lim) return true;
+  const short = a.length <= b.length ? a : b;
+  const long = a.length <= b.length ? b : a;
+  if (short.length < 5 || long.length < short.length + 2 || long.length > short.length + 10) return false;
+  const slack = short.length >= 10 ? 2 : 1;
+  for (let n = short.length; n <= short.length + 1 && n <= long.length; n++) {
+    for (let i = 0; i + n <= long.length; i++) {
+      if (lev(short, long.slice(i, i + n)) <= slack) return true;
+    }
+  }
+  return false;
+}
+
+/* Der Name muss zur eingegebenen Speise passen. Küchenarten wie „türkisch“ zählen nicht, Tippfehler schon. */
 export function dishFits(query, name){
   const q = normDish(query);
   const n = normDish(name);
   if (!q || !n) return false;
   const tokens = q.split(" ").filter(t => t.length >= 4 && !STOP.has(t) && !isCuisine(t));
-  if (!tokens.length) return n.includes(q);
+  const parts = n.split(" ");
+  if (!tokens.length) return n.includes(q) || parts.some(p => closeWord(q, p));
   const specific = tokens.filter(t => t.length >= 6);
   const need = specific.length ? specific : tokens;
-  return need.every(t => n.includes(t));
+  return need.every(t => n.includes(t) || parts.some(p => closeWord(t, p)));
 }
 
 export function dishesFromAi(data, query){
   if (!data || typeof data !== "object" || Array.isArray(data) || !Array.isArray(data.gerichte)) return null;
-  const out = [];
+  const fit = [];
+  const rest = [];
   const seen = new Set();
   for (const row of data.gerichte.slice(0, 8)) {
     if (!row || typeof row !== "object") continue;
     const name = String(row.name || "").replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
-    const g = num(row.gramm, 80, 900);
+    const g = num(row.gramm, 40, 900);
     const k = num(row.kcal, 40, 2500);
     const p = num(row.eiweiss, 0, 200);
     if (name.length < 2 || g == null || k == null || p == null) continue;
-    if (query && !dishFits(query, name)) continue;
     const key = normDish(name);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -48,9 +88,10 @@ export function dishesFromAi(data, query){
     dish.g0 = dish.g;
     dish.k0 = dish.k;
     dish.p0 = dish.p;
-    out.push(dish);
-    if (out.length >= 3) break;
+    if (!query || dishFits(query, name)) fit.push(dish);
+    else rest.push(dish);
   }
+  const out = (fit.length ? fit : rest).slice(0, 3);
   return out.length ? out : null;
 }
 
@@ -76,7 +117,7 @@ export function dishEntry(d){
   return { n: d.name + " (" + dishLabel(d) + ")", k: d.k, p: d.p, m: 1, est: 1 };
 }
 
-const KEY = "kochplaner.dish.v2";
+const KEY = "kochplaner.dish.v3";
 const MAX = 60;
 
 function readMap(store){
@@ -106,5 +147,5 @@ export function rememberDishes(store, q, list){
     if (Object.keys(next).length >= MAX) break;
   }
   try { store.setItem(KEY, JSON.stringify(next)); } catch (e) {}
-  try { if (store.removeItem) store.removeItem("kochplaner.dish.v1"); } catch (e) {}
+  try { if (store.removeItem) { store.removeItem("kochplaner.dish.v1"); store.removeItem("kochplaner.dish.v2"); } } catch (e) {}
 }

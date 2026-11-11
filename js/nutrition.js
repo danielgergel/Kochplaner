@@ -9,6 +9,42 @@ FOODDB.forEach(f => {
   f._u = f.u.map(x => [nm(x[0]), x[1], x[0]]);
 });
 
+function lev(a, b){
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > 2) return 3;
+  const prev = new Array(b.length + 1);
+  const cur = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    cur[0] = i;
+    let low = cur[0];
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      if (cur[j] < low) low = cur[j];
+    }
+    if (low > 2) return 3;
+    for (let j = 0; j <= b.length; j++) prev[j] = cur[j];
+  }
+  return prev[b.length];
+}
+
+function wordNear(w, x){
+  if (x === w || stripPl(x) === stripPl(w)) return true;
+  if (w.length < 5 || x.length < 4) return false;
+  if (x.includes(w) || w.includes(x)) return true;
+  const lim = Math.max(w.length, x.length) >= 10 ? 2 : 1;
+  if (Math.abs(w.length - x.length) <= lim && lev(w, x) <= lim) return true;
+  const short = w.length <= x.length ? w : x;
+  const long = w.length <= x.length ? x : w;
+  if (short.length < 5 || long.length < short.length + 2 || long.length > short.length + 10) return false;
+  const slack = short.length >= 10 ? 2 : 1;
+  for (let i = 0; i + short.length <= long.length; i++) {
+    if (lev(short, long.slice(i, i + short.length)) <= slack) return true;
+  }
+  return false;
+}
+
 export function scoreFood(f, q){
   let best = 0;
   const qt = q.split(" ");
@@ -19,8 +55,15 @@ export function scoreFood(f, q){
     else if (al.length >= 3 && q.length >= 3 && al.includes(q)) s = 40 + 10 * q.length / al.length;
     else {
       const at = al.split(" ");
-      const hit = qt.filter(w => w.length >= 3 && at.some(x => x === w || stripPl(x) === stripPl(w))).length;
-      if (hit) s = 20 * hit / qt.length + hit;
+      let hit = 0;
+      let tight = 0;
+      for (const w of qt) {
+        if (w.length < 3) continue;
+        if (!at.some(x => wordNear(w, x))) continue;
+        hit++;
+        if (qt.length === 1 && at.length === 1) tight = Math.max(tight, 12 - Math.abs(w.length - at[0].length));
+      }
+      if (hit) s = 20 * hit / qt.length + hit + tight;
     }
     if (s > best) best = s;
   }

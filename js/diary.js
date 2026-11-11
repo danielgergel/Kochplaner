@@ -109,6 +109,7 @@ let dishGen = 0;
 let dishQ = "";
 let dishList = [];
 let dishPick = null;
+let dishNote = "";
 function dishIndex(){
   for (let i = QP.length - 1; i >= 0; i--) if ((QP[i].q || "").trim().length >= 3) return i;
   return -1;
@@ -141,18 +142,28 @@ function queueDishes(){
   const i = dishIndex();
   const raw = i < 0 ? "" : (QP[i].q || "").trim();
   const key = normDish(raw);
-  if (key !== dishQ) { dishQ = key; dishList = []; dishPick = null; }
+  if (key !== dishQ) { dishQ = key; dishList = []; dishPick = null; dishNote = ""; }
   clearTimeout(dishTimer);
   paintQuick();
   if (key.length < 3) return;
   const cached = recallDishes(storage, raw);
-  if (cached) { dishList = cached; paintQuick(); return; }
-  if (!aiOnline()) return;
+  if (cached) { dishList = cached; dishNote = ""; paintQuick(); return; }
+  const localHit = i >= 0 && QP[i].foods && QP[i].foods.length;
+  if (!aiOnline()) {
+    if (!localHit) dishNote = "off";
+    paintQuick();
+    return;
+  }
   const gen = ++dishGen;
   dishTimer = setTimeout(async () => {
     const list = await fetchDishes(raw);
     if (gen !== dishGen || normDish(raw) !== dishQ) return;
-    if (!list) return;
+    if (!list) {
+      if (!(QP[i] && QP[i].foods && QP[i].foods.length)) dishNote = "ki";
+      paintQuick();
+      return;
+    }
+    dishNote = "";
     rememberDishes(storage, raw, list);
     dishList = list;
     paintQuick();
@@ -175,7 +186,10 @@ function qHtml(){
   if (!QP.length) return "";
   const rows = QP.map((pc, i) => {
     const c = calcPiece(pc);
-    if (!c) return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(pc.raw)}</b><span class="meta">Nicht gefunden. Trag Kalorien und Eiweiß unten selbst ein oder scanne den Barcode.</span>${dishBlock(i)}</div>`;
+    if (!c) {
+      const extra = dishIndex() === i && !dishList.length ? (dishNote === "off" ? " Ohne Verbindung kann ich das nicht schätzen." : dishNote === "ki" ? " Die Schätzung ist gerade nicht erreichbar." : "") : "";
+      return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(pc.raw)}</b><span class="meta">Nicht gefunden. Trag Kalorien und Eiweiß unten selbst ein oder scanne den Barcode.${extra}</span>${dishBlock(i)}</div>`;
+    }
     const alts = pc.foods.map((f, j) => j === pc.fi ? "" : `<button class="chipb" data-qalt="${i}:${j}">${esc(f.n)}</button>`).join("");
     const drink = isDrink(c.f);
     const units = (c.f._u || []).filter(u => u[2] !== "g" && u[2] !== "ml" && u[2] !== c.unitName);
@@ -335,6 +349,7 @@ export function drawDy(keep){
   dishQ = "";
   dishList = [];
   dishPick = null;
+  dishNote = "";
   const pnl = $("#pnl");
   const y = pnl.scrollTop;
   pnl.innerHTML = dyHtml();

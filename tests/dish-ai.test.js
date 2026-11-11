@@ -63,6 +63,20 @@ test("Fremde Gerichte fallen weg, höchstens drei Varianten bleiben", () => {
   assert.equal(dishFits("Döner", "Lahmacun"), false);
   assert.equal(dishFits("Pizza Margherita", "Pizza Funghi"), false);
   assert.equal(dishFits("Pizza Margherita", "Pizza Margherita dünn"), true);
+  assert.equal(dishFits("hänchen", "Hähnchenbrust, gebraten"), true);
+  assert.equal(dishFits("hänchen", "Reis"), false);
+  const chicken = dishesFromAi({
+    gerichte: [
+      { name: "Hähnchenbrust, gebraten", gramm: 150, kcal: 248, eiweiss: 46 },
+      { name: "Hähnchen mit Reis", gramm: 400, kcal: 650, eiweiss: 42 },
+      { name: "Ei, gekocht", gramm: 60, kcal: 90, eiweiss: 7 },
+    ],
+  }, "hänchen");
+  assert.deepEqual(chicken.map(d => d.name), ["Hähnchenbrust, gebraten", "Hähnchen mit Reis"]);
+  const kept = dishesFromAi({
+    gerichte: [{ name: "Nudeln mit Soße", gramm: 400, kcal: 560, eiweiss: 18 }],
+  }, "hänchen");
+  assert.equal(kept[0].name, "Nudeln mit Soße");
   const many = dishesFromAi({
     gerichte: [1, 2, 3, 4].map(i => ({ name: "Lahmacun Art " + i, gramm: 350, kcal: 600, eiweiss: 24 })),
   }, "Lahmacun");
@@ -71,6 +85,8 @@ test("Fremde Gerichte fallen weg, höchstens drei Varianten bleiben", () => {
 });
 
 test("Der Prompt nennt keine Beispielgerichte und keine Beispielwerte", () => {
+  assert.match(DISH_SYS, /Tippfehler/);
+  assert.match(DISH_SYS, /Grundzutat/);
   assert.match(DISH_SYS, /dieselbe Speise/);
   assert.match(DISH_SYS, /über 600 kcal/);
   assert.doesNotMatch(DISH_SYS, /manti|kartoffel|döner|doener|spaghetti|schnitzel|pizza|lahmacun|bolognese|roulade|spätzle/i);
@@ -88,9 +104,11 @@ test("Geschätzte Gerichte bleiben im lokalen Speicher und kommen ohne Netz wied
   };
   const list = dishesFromAi({ gerichte: [{ name: "Döner", gramm: 400, kcal: 700, eiweiss: 35 }] });
   store.setItem("kochplaner.dish.v1", JSON.stringify({ doener: [{ name: "Alter Döner", gramm: 400, kcal: 100, eiweiss: 5 }] }));
+  store.setItem("kochplaner.dish.v2", JSON.stringify({ doener: [{ name: "Alter Döner", gramm: 400, kcal: 100, eiweiss: 5 }] }));
   rememberDishes(store, "Döner", list);
   assert.equal(store.getItem("kochplaner.dish.v1"), null);
-  assert.match(store.getItem("kochplaner.dish.v2"), /Döner/);
+  assert.equal(store.getItem("kochplaner.dish.v2"), null);
+  assert.match(store.getItem("kochplaner.dish.v3"), /Döner/);
   const again = recallDishes(store, "doener");
   assert.equal(again[0].name, "Döner");
   assert.equal(again[0].k, 700);
