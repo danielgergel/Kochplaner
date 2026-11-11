@@ -2,9 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { dishesFromAi, resizeDish, dishEntry, dishLabel, recallDishes, rememberDishes, normDish } from "../js/dish-ai.js";
+import fs from "node:fs";
+import { dishesFromAi, dishFits, resizeDish, dishEntry, dishLabel, recallDishes, rememberDishes, normDish } from "../js/dish-ai.js";
 import { sanitizeEntry } from "../js/validate.js";
-import worker from "../ai-worker/worker.js";
+import worker, { DISH_SYS } from "../ai-worker/worker.js";
 
 const root = path.resolve(import.meta.dirname, "..");
 
@@ -38,14 +39,58 @@ test("Gerichtsvorschläge bleiben im Schema, Prompt-Müll fällt weg", () => {
   assert.equal(sanitizeEntry({ n: "Kaffee", k: 2, p: 0.2, m: 1 }).est, undefined);
 });
 
+test("Fremde Gerichte fallen weg, höchstens drei Varianten bleiben", () => {
+  const manti = dishesFromAi({
+    gerichte: [
+      { name: "Manti mit Joghurt-Knoblauch-Soße", gramm: 450, kcal: 680, eiweiss: 30 },
+      { name: "Spaghetti Bolognese", gramm: 400, kcal: 650, eiweiss: 28 },
+      { name: "Kartoffelsalat", gramm: 300, kcal: 280, eiweiss: 5 },
+      { name: "Schnitzel mit Pommes", gramm: 450, kcal: 800, eiweiss: 35 },
+      { name: "Manti klein", gramm: 300, kcal: 460, eiweiss: 20 },
+    ],
+  }, "türkische Manti");
+  assert.deepEqual(manti.map(d => d.name), ["Manti mit Joghurt-Knoblauch-Soße", "Manti klein"]);
+  const salad = dishesFromAi({
+    gerichte: [
+      { name: "Käsespätzle", gramm: 400, kcal: 700, eiweiss: 28 },
+      { name: "Kartoffelsalat mit Mayo", gramm: 350, kcal: 480, eiweiss: 7 },
+      { name: "Rinderroulade", gramm: 400, kcal: 650, eiweiss: 40 },
+      { name: "Schwäbischer Kartoffelsalat", gramm: 320, kcal: 240, eiweiss: 4 },
+    ],
+  }, "Kartoffelsalat");
+  assert.deepEqual(salad.map(d => d.name), ["Kartoffelsalat mit Mayo", "Schwäbischer Kartoffelsalat"]);
+  assert.equal(dishFits("Döner", "Döner im Brot"), true);
+  assert.equal(dishFits("Döner", "Lahmacun"), false);
+  assert.equal(dishFits("Pizza Margherita", "Pizza Funghi"), false);
+  assert.equal(dishFits("Pizza Margherita", "Pizza Margherita dünn"), true);
+  const many = dishesFromAi({
+    gerichte: [1, 2, 3, 4].map(i => ({ name: "Lahmacun Art " + i, gramm: 350, kcal: 600, eiweiss: 24 })),
+  }, "Lahmacun");
+  assert.equal(many.length, 3);
+  assert.equal(dishesFromAi({ gerichte: [{ name: "Manti", gramm: 450, kcal: 0, eiweiss: 30 }] }, "Manti"), null);
+});
+
+test("Der Prompt nennt keine Beispielgerichte und keine Beispielwerte", () => {
+  assert.match(DISH_SYS, /dieselbe Speise/);
+  assert.match(DISH_SYS, /über 600 kcal/);
+  assert.doesNotMatch(DISH_SYS, /manti|kartoffel|döner|doener|spaghetti|schnitzel|pizza|lahmacun|bolognese|roulade|spätzle/i);
+  assert.doesNotMatch(DISH_SYS, /"gramm":350|"kcal":400|"eiweiss":12/);
+  const src = fs.readFileSync(path.join(root, "ai-worker/worker.js"), "utf8");
+  assert.match(src, /dishesFromAi\(out\.json, dishQuery\)/);
+});
+
 test("Geschätzte Gerichte bleiben im lokalen Speicher und kommen ohne Netz wieder", () => {
   const mem = new Map();
   const store = {
     getItem: k => mem.has(k) ? mem.get(k) : null,
     setItem: (k, v) => mem.set(k, String(v)),
+    removeItem: k => mem.delete(k),
   };
   const list = dishesFromAi({ gerichte: [{ name: "Döner", gramm: 400, kcal: 700, eiweiss: 35 }] });
+  store.setItem("kochplaner.dish.v1", JSON.stringify({ doener: [{ name: "Alter Döner", gramm: 400, kcal: 100, eiweiss: 5 }] }));
   rememberDishes(store, "Döner", list);
+  assert.equal(store.getItem("kochplaner.dish.v1"), null);
+  assert.match(store.getItem("kochplaner.dish.v2"), /Döner/);
   const again = recallDishes(store, "doener");
   assert.equal(again[0].name, "Döner");
   assert.equal(again[0].k, 700);
