@@ -120,9 +120,22 @@ function dishBlock(i){
   const picked = chosen ? `<p class="note" style="margin:6px 0 0">geschätzt, ${esc(dishLabel(chosen))}</p><div class="frm"><label>kcal<input data-qkcal="${i}" inputmode="decimal" value="${chosen.k}" aria-label="Geschätzte kcal"></label><label>Eiweiß (g)<input data-qprot="${i}" inputmode="decimal" value="${chosen.p}" aria-label="Geschätztes Eiweiß in Gramm"></label></div><div class="alts"><button type="button" class="chipb" data-qsize="${i}:-50" aria-label="Kleinere Portion">−50 g</button><button type="button" class="chipb" data-qsize="${i}:50" aria-label="Größere Portion">+50 g</button></div>` : "";
   return (chips ? `<div class="alts">Vorschlag: ${chips}</div>` : "") + picked;
 }
+function syncAddButton(){
+  const btn = $("#qadd");
+  if (!btn) return;
+  const sum = quickTotals();
+  if (!sum.ok) { btn.hidden = true; return; }
+  const mark = dishPick ? "~" : "";
+  btn.hidden = false;
+  btn.textContent = "Eintragen: " + mark + Math.round(sum.tk) + " kcal · " + mark + f1(sum.tp) + " g Eiweiß";
+  const field = $("#qk");
+  if (field) field.style.scrollMarginTop = "130px";
+  if (document.activeElement === field) field.scrollIntoView({ block: "nearest" });
+}
 function paintQuick(){
   const box = $("#qkp");
   if (box) box.innerHTML = qHtml();
+  syncAddButton();
 }
 function queueDishes(){
   const i = dishIndex();
@@ -169,9 +182,7 @@ function qHtml(){
     const uchips = units.length ? units.map(u => `<button class="chipb" data-qunit="${i}:${esc(u[2])}">${esc(unitCaption(u[2], u[1], drink))}</button>`).join("") : "";
     return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(c.f.n)} · ${esc(c.label)}</b><span class="meta">${Math.round(c.k)} kcal · ${f1(c.p)} g Eiweiß</span>${uchips ? `<div class="alts">Einheit: ${uchips}</div>` : ""}${alts ? `<div class="alts">Meintest du: ${alts}</div>` : ""}${dishBlock(i)}</div>`;
   }).join("");
-  const sum = quickTotals();
-  const mark = dishPick ? "~" : "";
-  return `<div class="box" style="margin-top:6px">${rows}</div>` + (sum.ok ? `<button class="btn pri" data-qadd style="width:100%;margin-top:8px">Eintragen: ${mark}${Math.round(sum.tk)} kcal · ${mark}${f1(sum.tp)} g Eiweiß</button>` : "");
+  return `<div class="box" style="margin-top:6px">${rows}</div>`;
 }
 
 function suggestHtml(){
@@ -283,6 +294,7 @@ export function dyHtml(){
   <div class="tot"><div><div class="row1"><b>${Math.round(t.k)} kcal</b><span>Ziel ${G.k} · noch ${Math.round(G.k - t.k)}</span></div>${barHtml(t.k, G.k)}</div>
    <div><div class="row1"><b>${f1(t.p)} g Eiweiß</b><span>Ziel ${G.p} · noch ${f1(G.p - t.p)}</span></div>${barHtml(t.p, G.p, true)}</div></div>
   <h3 class="sec">Schnell eintragen</h3>
+  <button id="qadd" class="btn pri" data-qadd hidden>Eintragen</button>
   <input id="qk" class="finp" placeholder="z. B. 4 Kaffee, 2 Brötchen mit Butter, Pommes" autocomplete="off" autocapitalize="none" aria-label="Was hast du gegessen oder getrunken?">
   <div id="qkp">${qHtml()}</div>
   <div class="stack"><button class="btn" data-scan>Barcode scannen</button></div>
@@ -361,11 +373,7 @@ export function bindDiary(){
         const scaled = d.g > 0 ? d.g0 / d.g : 1;
         if (kcal) { d.k = Math.round(n); d.k0 = Math.round(d.k * scaled); }
         else { d.p = Math.round(n * 10) / 10; d.p0 = Math.round(d.p * scaled * 10) / 10; }
-        const btn = document.querySelector("[data-qadd]");
-        if (btn) {
-          const sum = quickTotals();
-          btn.textContent = "Eintragen: ~" + Math.round(sum.tk) + " kcal · ~" + f1(sum.tp) + " g Eiweiß";
-        }
+        syncAddButton();
       }
     }
   });
@@ -454,13 +462,13 @@ export function bindDiary(){
       }
       if (d.dyf !== undefined) { const f = DY.foods[+d.dyf]; addEntry({ n:f.n, k:f.k, p:f.p }); drawDy(true); toast("Eingetragen"); return; }
       if (d.dyfx !== undefined) { DY.foods.splice(+d.dyfx, 1); dsave(); drawDy(true); return; }
-      if (d.qalt) { const [i, j] = d.qalt.split(":").map(Number); QP[i].fi = j; delete QP[i].unitForce; dishPick = null; $("#qkp").innerHTML = qHtml(); return; }
+      if (d.qalt) { const [i, j] = d.qalt.split(":").map(Number); QP[i].fi = j; delete QP[i].unitForce; dishPick = null; paintQuick(); return; }
       if (d.qunit) {
         const cut = d.qunit.indexOf(":");
         const i = Number(d.qunit.slice(0, cut));
         if (QP[i]) QP[i].unitForce = d.qunit.slice(cut + 1);
         dishPick = null;
-        $("#qkp").innerHTML = qHtml();
+        paintQuick();
         return;
       }
       if (d.qdish) {
