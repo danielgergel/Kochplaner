@@ -1,5 +1,6 @@
 /* Prüfung der KI-Antworten und die Aufrufe. Ungeprüftes JSON kommt nicht ins Rezept. */
 import { parseRecipeText } from "./ocr-text.js";
+import { dishesFromAi } from "./dish-ai.js";
 
 export const AI_BASE = "https://kochplaner-ki.danielgergel.workers.dev";
 export const AI_NOTE = "Anleitung von KI erstellt.";
@@ -164,6 +165,14 @@ export function mealFromAi(data){
   }
   return out.length ? out : null;
 }
+export async function fetchDishes(text){
+  if (!aiOnline()) return null;
+  const q = String(text || "").trim().slice(0, 80);
+  if (q.length < 3) return null;
+  const remote = await postAi("/vorschlaege", { text: q });
+  return dishesFromAi(remote);
+}
+
 export async function fetchMeal(text, known){
   if (!aiOnline()) return null;
   const t = String(text || "").trim().slice(0, MEAL_MAX);

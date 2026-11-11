@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/ocr-text.test.js tests/validate.test.js tests/theme.test.js tests/offline-assets.test.js tests/recipe-badge.test.js tests/offer-match.test.js tests/household.test.js tests/share.test.js tests/firebase-init.test.js tests/panel-return.test.js tests/diary-link.test.js tests/diary-units.test.js tests/ai-recipe.test.js tests/meal.test.js tests/product.test.js tests/meal-ai.test.js"
+    "test": "node --test tests/ocr-text.test.js tests/validate.test.js tests/theme.test.js tests/offline-assets.test.js tests/recipe-badge.test.js tests/offer-match.test.js tests/household.test.js tests/share.test.js tests/firebase-init.test.js tests/panel-return.test.js tests/diary-link.test.js tests/diary-units.test.js tests/ai-recipe.test.js tests/meal.test.js tests/product.test.js tests/meal-ai.test.js tests/dish-ai.test.js"
   }
 }
