@@ -238,21 +238,22 @@ function last7(){
   return days;
 }
 
-function bars(rows, key, max, goal){
-  const W = 336, H = 132, base = 100, n = rows.length;
-  const slot = (W - 8) / n, bw = slot - 8;
-  const yTarget = base - (goal / max) * (base - 16);
-  let body = `<line x1="4" x2="${W - 4}" y1="${yTarget.toFixed(1)}" y2="${yTarget.toFixed(1)}" stroke="currentColor" stroke-dasharray="4 3" stroke-width="1.2" opacity="0.55"/>`;
+function lineChart(rows, key, max, goal, label){
+  const W = 336, H = 132, top = 16, base = 100, n = rows.length;
+  const yOf = v => base - (Math.max(0, v) / max) * (base - top);
+  const xOf = i => n <= 1 ? W / 2 : 22 + i * ((W - 44) / (n - 1));
+  const yTarget = yOf(goal);
+  let body = "";
+  if (goal > 0) body += `<line x1="12" x2="${W - 12}" y1="${yTarget.toFixed(1)}" y2="${yTarget.toFixed(1)}" stroke="currentColor" stroke-dasharray="4 3" stroke-width="1.2" opacity="0.55"/>`;
+  const pts = rows.map((r, i) => `${xOf(i).toFixed(1)},${yOf(r[key]).toFixed(1)}`).join(" ");
+  body += `<polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`;
   rows.forEach((r, i) => {
-    const v = r[key];
-    const h = Math.max(v > 0 ? 2 : 0, (v / max) * (base - 16));
-    const x = 4 + i * slot + 4;
-    const y = base - h;
-    const fill = v > goal ? "var(--warn)" : "var(--accent)";
-    body += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="${fill}" opacity="${r.today ? 1 : 0.85}"/>`;
-    body += `<text x="${(x + bw / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="12" font-weight="${r.today ? 700 : 500}" fill="currentColor">${r.wd}</text>`;
+    const x = xOf(i), y = yOf(r[key]);
+    const fill = r[key] > goal ? "var(--warn)" : "var(--accent)";
+    body += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.today ? 4.5 : 3.5}" fill="${fill}"/>`;
+    body += `<text x="${x.toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="12" font-weight="${r.today ? 700 : 500}" fill="currentColor">${r.wd}</text>`;
   });
-  return `<svg viewBox="0 0 ${W} ${H}" role="img">${body}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">${body}</svg>`;
 }
 
 function weekChartHtml(){
@@ -266,10 +267,10 @@ function weekChartHtml(){
   return `<h3 class="sec">Wochenbilanz</h3>
   <div class="chartbox chart">
     <div class="cap"><b>Kalorien</b><span>Tagesziel ${G.k} kcal</span></div>
-    ${bars(rows, "k", maxK, G.k)}
+    ${lineChart(rows, "k", maxK, G.k, "Kalorien der letzten sieben Tage")}
     <div class="cap"><b>Eiweiß</b><span>Tagesziel ${G.p} g</span></div>
-    ${bars(rows, "p", maxP, G.p)}
-    <p class="note">Sieben Tage zusammen ${Math.round(sumK)} kcal (Ziel ${G.k * 7}) und ${f1(sumP)} g Eiweiß (Ziel ${G.p * 7}). Die gestrichelte Linie ist dein Tagesziel. Balken über dem Ziel sind hervorgehoben.</p>
+    ${lineChart(rows, "p", maxP, G.p, "Eiweiß der letzten sieben Tage")}
+    <p class="note">Sieben Tage zusammen ${Math.round(sumK)} kcal (Ziel ${G.k * 7}) und ${f1(sumP)} g Eiweiß (Ziel ${G.p * 7}). Die gestrichelte Linie ist dein Tagesziel. Punkte über dem Ziel sind hervorgehoben.</p>
     ${list}
     <h3 class="sec">Tagesziel</h3>
     <div class="frm"><label>kcal<input id="dg-k" inputmode="numeric" value="${G.k}"></label><label>Eiweiß (g)<input id="dg-p" inputmode="numeric" value="${G.p}"></label></div>

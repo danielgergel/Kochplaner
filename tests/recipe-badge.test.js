@@ -77,3 +77,16 @@ test("Tagebuch: Schnelleintrag steht oben, Wochenbilanz ganz unten", () => {
   assert.ok(quick > 0 && add > quick && field > add && preview > field && meal > preview && eaten > meal && foods > eaten && chart > foods);
   assert.equal(html.indexOf("${weekChartHtml()}"), html.lastIndexOf("${weekChartHtml()}"));
 });
+
+test("Wochenbilanz zeichnet zwei Linien, die Tagesliste bleibt", () => {
+  const src = fs.readFileSync(path.join(import.meta.dirname, "../js/diary.js"), "utf8");
+  const fn = src.slice(src.indexOf("function lineChart"), src.indexOf("const FOLD"));
+  assert.match(fn, /Kalorien der letzten sieben Tage/);
+  assert.match(fn, /Eiweiß der letzten sieben Tage/);
+  assert.match(fn, /polyline/);
+  assert.match(fn, /stroke-dasharray/);
+  assert.doesNotMatch(fn, /<rect /);
+  assert.match(fn, /class="wk7"/);
+  assert.match(fn, /\$\{barHtml\(r\.k, G\.k\)\}/);
+  assert.match(fn, /\$\{Math\.round\(r\.k\)\} kcal · \$\{Math\.round\(r\.p\)\} g/);
+});
