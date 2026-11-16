@@ -376,11 +376,41 @@ export function sanitizeMeal(m){
 }
 
 export function diaryPayloadOk(raw){
-  return isObj(raw) && (isObj(raw.days) || Array.isArray(raw.foods) || isObj(raw.goal));
+  return isObj(raw) && (isObj(raw.days) || Array.isArray(raw.foods) || isObj(raw.goal) || isObj(raw.habits));
+}
+
+function sanitizeHabits(v){
+  if (!isObj(v)) return {};
+  const out = {};
+  for (const key of Object.keys(v).slice(0, 200)) {
+    const id = nmKey(key);
+    const h = v[key];
+    if (!id || !isObj(h)) continue;
+    const n = str(h.n, 80);
+    if (!n) continue;
+    const c = Math.round(asNumber(h.c) || 0);
+    if (c < 1 || c > 100000) continue;
+    const t = asNumber(h.t);
+    const row = { n, c, t: t != null && t >= 0 ? t : 0, kind: h.kind === "dish" ? "dish" : "food" };
+    const unit = str(h.unit, 24);
+    if (unit) row.unit = unit;
+    const qty = asNumber(h.qty);
+    if (qty != null && qty > 0 && qty <= 10000) row.qty = Math.round(qty * 10) / 10;
+    const g = macro(h.g, 5000), k = macro(h.k, 20000), p = macro(h.p, 2000);
+    if (g != null && g > 0) row.g = g;
+    if (k != null) row.k = k;
+    if (p != null) row.p = p;
+    out[id] = row;
+  }
+  return out;
+}
+
+function nmKey(s){
+  return String(s || "").toLowerCase().replace(/ß/g, "ss").replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
 }
 
 export function sanitizeDiary(raw){
-  const out = { goal:{ k:2100, p:150 }, days:{}, foods:[], meals:[], u:0 };
+  const out = { goal:{ k:2100, p:150 }, days:{}, foods:[], meals:[], habits:{}, habitSeed:0, u:0 };
   if (!isObj(raw)) return out;
   const gk = macro(raw.goal && raw.goal.k, 9000);
   const gp = macro(raw.goal && raw.goal.p, 500);
@@ -406,6 +436,8 @@ export function sanitizeDiary(raw){
       if (out.foods.length >= 200) break;
     }
   }
+  out.habits = sanitizeHabits(raw.habits);
+  if (raw.habitSeed) out.habitSeed = 1;
   if (Array.isArray(raw.meals)) {
     for (const m of raw.meals) {
       const s = sanitizeMeal(m);

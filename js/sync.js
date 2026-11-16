@@ -175,6 +175,12 @@ function dMerge(r){
     if (have < 0) DY.meals.push(m);
     else if ((m.u || 0) > (DY.meals[have].u || 0)) DY.meals[have] = m;
   });
+  if (!DY.habits || typeof DY.habits !== "object") DY.habits = {};
+  for (const [k, h] of Object.entries(inc.habits || {})) {
+    const have = DY.habits[k];
+    if (!have || (h.c || 0) > (have.c || 0) || ((h.c || 0) === (have.c || 0) && (h.t || 0) > (have.t || 0))) DY.habits[k] = h;
+  }
+  if (inc.habitSeed) DY.habitSeed = 1;
 }
 export function dStop(){
   if (dUnsub) { try { dUnsub(); } catch (e) {} dUnsub = null; }

@@ -1,8 +1,9 @@
 import { catalog, DY, ST, ui, dsave, persist, storage } from "./state.js";
-import { $, esc, toast, f1, dkey, dlabel, WDSHORT } from "./util.js";
+import { $, esc, toast, f1, dkey, dlabel, WDSHORT, nm } from "./util.js";
 import { grp } from "./recipes.js";
 import { badgeOf, haystack } from "./recipe-badge.js";
-import { parsePiece, calcPiece, isDrink, unitCaption } from "./nutrition.js";
+import { parsePiece, calcPiece, isDrink, unitCaption, findFoods } from "./nutrition.js";
+import { seedHabits, rankFoods, applyHabitPortion, habitScore, touchHabit, topHabits, dishHabits } from "./habits.js";
 import { aiOnline, fetchDishes } from "./ai-recipe.js";
 import { normDish, recallDishes, rememberDishes, resizeDish, dishLabel, dishEntry } from "./dish-ai.js";
 import { showPanel } from "./panels.js";
@@ -110,6 +111,43 @@ let dishQ = "";
 let dishList = [];
 let dishPick = null;
 let dishNote = "";
+let notedKey = "";
+function ensureHabits(){
+  if (!DY.habits || typeof DY.habits !== "object" || Array.isArray(DY.habits)) DY.habits = {};
+  if (DY.habitSeed) return;
+  DY.habits = seedHabits(DY.days, DY.habits);
+  DY.habitSeed = 1;
+  dsave();
+}
+function tunePiece(pc){
+  if (!pc || !pc.q) return;
+  const q = nm(pc.q);
+  pc.foods = rankFoods(findFoods(q, 12), q, DY.habits).slice(0, 4);
+  pc.fi = 0;
+  const h = pc.foods[0] && DY.habits[nm(pc.foods[0].n)];
+  if (h && h.kind !== "dish") applyHabitPortion(pc, h);
+}
+function remember(info){
+  if (!info || !info.key) return;
+  ensureHabits();
+  const count = notedKey !== info.key;
+  touchHabit(DY.habits, info, count);
+  if (count) notedKey = info.key;
+  dsave();
+}
+function star(name){
+  const h = DY.habits && DY.habits[nm(name)];
+  return h && h.c >= 3 ? `<span class="hab" aria-label="häufig">★</span>` : "";
+}
+function habitDishes(q){
+  return dishHabits(DY.habits, q).map(h => ({ name: h.n, g: h.g || 150, k: h.k, p: h.p, g0: h.g || 150, k0: h.k, p0: h.p }));
+}
+function mergeDishes(ai, q){
+  const hints = habitDishes(q);
+  const seen = new Set(hints.map(d => nm(d.name)));
+  const rest = (ai || []).filter(d => d && !seen.has(nm(d.name)));
+  return hints.concat(rest).sort((a, b) => habitScore(DY.habits[nm(b.name)]) - habitScore(DY.habits[nm(a.name)])).slice(0, 4);
+}
 function dishIndex(){
   for (let i = QP.length - 1; i >= 0; i--) if ((QP[i].q || "").trim().length >= 3) return i;
   return -1;
@@ -117,7 +155,7 @@ function dishIndex(){
 function dishBlock(i){
   if (dishIndex() !== i) return "";
   const chosen = dishPick && dishPick.i === i ? dishPick.dish : null;
-  const chips = dishList.map((d, j) => `<button type="button" class="chipb" data-qdish="${i}:${j}" aria-pressed="${dishPick && dishPick.j === j ? "true" : "false"}">${esc(d.name)} · Portion (${d.g} g) · ~${d.k} kcal</button>`).join("");
+  const chips = dishList.map((d, j) => `<button type="button" class="chipb" data-qdish="${i}:${j}" aria-pressed="${dishPick && dishPick.j === j ? "true" : "false"}">${esc(d.name)}${star(d.name)} · Portion (${d.g} g) · ~${d.k} kcal</button>`).join("");
   const picked = chosen ? `<p class="note" style="margin:6px 0 0">geschätzt, ${esc(dishLabel(chosen))}</p><div class="frm"><label>kcal<input data-qkcal="${i}" inputmode="decimal" value="${chosen.k}" aria-label="Geschätzte kcal"></label><label>Eiweiß (g)<input data-qprot="${i}" inputmode="decimal" value="${chosen.p}" aria-label="Geschätztes Eiweiß in Gramm"></label></div><div class="alts"><button type="button" class="chipb" data-qsize="${i}:-50" aria-label="Kleinere Portion">−50 g</button><button type="button" class="chipb" data-qsize="${i}:50" aria-label="Größere Portion">+50 g</button></div>` : "";
   return (chips ? `<div class="alts">Vorschlag: ${chips}</div>` : "") + picked;
 }
@@ -147,7 +185,9 @@ function queueDishes(){
   paintQuick();
   if (key.length < 3) return;
   const cached = recallDishes(storage, raw);
-  if (cached) { dishList = cached; dishNote = ""; paintQuick(); return; }
+  if (cached) { dishList = mergeDishes(cached, raw); dishNote = ""; paintQuick(); return; }
+  const known = habitDishes(raw);
+  if (known.length) { dishList = known; paintQuick(); }
   const localHit = i >= 0 && QP[i].foods && QP[i].foods.length;
   if (!aiOnline()) {
     if (!localHit) dishNote = "off";
@@ -165,12 +205,15 @@ function queueDishes(){
     }
     dishNote = "";
     rememberDishes(storage, raw, list);
-    dishList = list;
+    dishList = mergeDishes(list, raw);
     paintQuick();
   }, 600);
 }
 function qParse(text){
+  notedKey = "";
   QP = text.replace(/(\d),(\d)/g, "$1§$2").split(/\s*(?:,|\+|&|\bund\b|\bplus\b|\bmit\b)\s*/i).map(p => parsePiece(p.replace(/§/g, ","))).filter(Boolean);
+  ensureHabits();
+  QP.forEach(tunePiece);
 }
 function quickTotals(){
   let tk = 0, tp = 0, ok = 0;
@@ -182,19 +225,25 @@ function quickTotals(){
   });
   return { tk, tp, ok };
 }
+function freqHtml(){
+  ensureHabits();
+  const top = topHabits(DY.habits, 4, 2);
+  if (!top.length) return "";
+  return `<div class="alts">Häufig: ${top.map(h => `<button type="button" class="chipb" data-qhab="${esc(h.key)}">${esc(h.n)}${h.c >= 3 ? " ★" : ""}</button>`).join("")}</div>`;
+}
 function qHtml(){
-  if (!QP.length) return "";
+  if (!QP.length) return freqHtml();
   const rows = QP.map((pc, i) => {
     const c = calcPiece(pc);
     if (!c) {
       const extra = dishIndex() === i && !dishList.length ? (dishNote === "off" ? " Ohne Verbindung kann ich das nicht schätzen." : dishNote === "ki" ? " Die Schätzung ist gerade nicht erreichbar." : "") : "";
       return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(pc.raw)}</b><span class="meta">Nicht gefunden. Trag Kalorien und Eiweiß unten selbst ein oder scanne den Barcode.${extra}</span>${dishBlock(i)}</div>`;
     }
-    const alts = pc.foods.map((f, j) => j === pc.fi ? "" : `<button class="chipb" data-qalt="${i}:${j}">${esc(f.n)}</button>`).join("");
+    const alts = pc.foods.map((f, j) => j === pc.fi ? "" : `<button class="chipb" data-qalt="${i}:${j}">${esc(f.n)}${star(f.n)}</button>`).join("");
     const drink = isDrink(c.f);
     const units = (c.f._u || []).filter(u => u[2] !== "g" && u[2] !== "ml" && u[2] !== c.unitName);
     const uchips = units.length ? units.map(u => `<button class="chipb" data-qunit="${i}:${esc(u[2])}">${esc(unitCaption(u[2], u[1], drink))}</button>`).join("") : "";
-    return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(c.f.n)} · ${esc(c.label)}</b><span class="meta">${Math.round(c.k)} kcal · ${f1(c.p)} g Eiweiß</span>${uchips ? `<div class="alts">Einheit: ${uchips}</div>` : ""}${alts ? `<div class="alts">Meintest du: ${alts}</div>` : ""}${dishBlock(i)}</div>`;
+    return `<div class="ent" style="grid-template-columns:1fr"><b>${esc(c.f.n)}${star(c.f.n)} · ${esc(c.label)}</b><span class="meta">${Math.round(c.k)} kcal · ${f1(c.p)} g Eiweiß</span>${uchips ? `<div class="alts">Einheit: ${uchips}</div>` : ""}${alts ? `<div class="alts">Meintest du: ${alts}</div>` : ""}${dishBlock(i)}</div>`;
   }).join("");
   return `<div class="box" style="margin-top:6px">${rows}</div>`;
 }
@@ -478,19 +527,50 @@ export function bindDiary(){
       }
       if (d.dyf !== undefined) { const f = DY.foods[+d.dyf]; addEntry({ n:f.n, k:f.k, p:f.p }); drawDy(true); toast("Eingetragen"); return; }
       if (d.dyfx !== undefined) { DY.foods.splice(+d.dyfx, 1); dsave(); drawDy(true); return; }
-      if (d.qalt) { const [i, j] = d.qalt.split(":").map(Number); QP[i].fi = j; delete QP[i].unitForce; dishPick = null; paintQuick(); return; }
+      if (d.qhab) {
+        const h = DY.habits && DY.habits[d.qhab];
+        const input = $("#qk");
+        if (h && input) {
+          input.value = h.n;
+          notedKey = "";
+          QP = [parsePiece(h.n)].filter(Boolean);
+          ensureHabits();
+          QP.forEach(tunePiece);
+          queueDishes();
+        }
+        return;
+      }
+      if (d.qalt) {
+        const [i, j] = d.qalt.split(":").map(Number);
+        const chosen = QP[i] && QP[i].foods[j];
+        if (QP[i]) { QP[i].fi = j; delete QP[i].unitForce; }
+        dishPick = null;
+        if (chosen) remember({ key: nm(chosen.n), n: chosen.n, kind: "food" });
+        if (QP[i] && chosen) {
+          tunePiece(QP[i]);
+          const idx = QP[i].foods.findIndex(f => f.n === chosen.n);
+          QP[i].fi = idx >= 0 ? idx : 0;
+        }
+        paintQuick();
+        return;
+      }
       if (d.qunit) {
         const cut = d.qunit.indexOf(":");
         const i = Number(d.qunit.slice(0, cut));
         if (QP[i]) QP[i].unitForce = d.qunit.slice(cut + 1);
         dishPick = null;
+        const c = QP[i] && calcPiece(QP[i]);
+        if (c) remember({ key: nm(c.f.n), n: c.f.n, kind: "food", unit: c.unitName, qty: QP[i].n });
         paintQuick();
         return;
       }
       if (d.qdish) {
         const [i, j] = d.qdish.split(":").map(Number);
         const picked = dishList[j];
-        if (picked) dishPick = { i, j, dish: Object.assign({}, picked) };
+        if (picked) {
+          dishPick = { i, j, dish: Object.assign({}, picked) };
+          remember({ key: nm(picked.name), n: picked.name, kind: "dish", g: picked.g, k: picked.k, p: picked.p, qty: 1 });
+        }
         paintQuick();
         return;
       }
@@ -503,9 +583,18 @@ export function bindDiary(){
       if (d.qadd !== undefined) {
         let n = 0;
         QP.forEach((pc, i) => {
-          if (dishPick && dishPick.i === i) { addEntry(dishEntry(dishPick.dish)); n++; return; }
+          if (dishPick && dishPick.i === i) {
+            addEntry(dishEntry(dishPick.dish));
+            remember({ key: nm(dishPick.dish.name), n: dishPick.dish.name, kind: "dish", g: dishPick.dish.g, k: dishPick.dish.k, p: dishPick.dish.p, qty: 1 });
+            n++;
+            return;
+          }
           const c = calcPiece(pc);
-          if (c) { addEntry({ n:c.f.n + " (" + c.label + ")", k:c.k, p:c.p }); n++; }
+          if (c) {
+            addEntry({ n:c.f.n + " (" + c.label + ")", k:c.k, p:c.p });
+            remember({ key: nm(c.f.n), n: c.f.n, kind: "food", unit: c.unitName, qty: pc.n });
+            n++;
+          }
         });
         QP = [];
         drawDy(true);
