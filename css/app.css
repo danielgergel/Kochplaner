@@ -219,6 +219,7 @@ a{color:var(--accent)}
 .ic button{width:44px;height:44px}
 .step button,.ent .eac button{width:44px;height:44px}
 .chipb{min-height:40px}
+.hab{color:var(--accent);font-size:.85em;margin-left:4px}
 .chips button{min-height:42px}
 
 body{padding-top:env(safe-area-inset-top,0px)}

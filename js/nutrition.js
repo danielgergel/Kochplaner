@@ -70,9 +70,10 @@ export function scoreFood(f, q){
   return best;
 }
 
-export function findFoods(q){
+export function findFoods(q, limit){
   if (!q) return [];
-  return FOODDB.map(f => ({ f, s:scoreFood(f, q) })).filter(x => x.s > 0).sort((a, b) => b.s - a.s).slice(0, 4).map(x => x.f);
+  const n = limit > 0 ? limit : 4;
+  return FOODDB.map(f => ({ f, s:scoreFood(f, q) })).filter(x => x.s > 0).sort((a, b) => b.s - a.s).slice(0, n).map(x => x.f);
 }
 
 export function parsePiece(raw){

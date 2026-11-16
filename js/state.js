@@ -73,6 +73,7 @@ if (!(Number(DY.goal.p) > 0)) DY.goal.p = 150;
 if (!DY.days || typeof DY.days !== "object") DY.days = {};
 if (!Array.isArray(DY.foods)) DY.foods = [];
 if (!Array.isArray(DY.meals)) DY.meals = [];
+if (!DY.habits || typeof DY.habits !== "object" || Array.isArray(DY.habits)) DY.habits = {};
 
 export let HH = null;
 {
