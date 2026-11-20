@@ -1,6 +1,7 @@
 import { ST, ui, persist } from "./state.js";
 import { $, esc, toast, ck, dkey } from "./util.js";
 import { CATS, shopList } from "./shopcalc.js";
+import { groupManual } from "./shop-cat.js";
 import { offersHtml, refreshOffers } from "./offers.js";
 
 export const CHECK_MS = 30 * 60 * 1000;
@@ -102,17 +103,20 @@ function manualHtml(){
 
 const XSUG = ["Backpapier","Küchenrolle","Salz","Alufolie","Gefrierbeutel","Spülmittel"];
 function exList(){ if (!Array.isArray(ST.extra)) ST.extra = []; return ST.extra; }
+function exRow(x){
+  return `<div style="display:flex;align-items:stretch"><button class="ck" role="checkbox" aria-checked="${!!x.d}" data-exck="${x.i}" style="grid-template-columns:30px 1fr;flex:1"><i>${ck}</i><span class="l">${esc(x.t)}</span></button><button data-exdel="${x.i}" aria-label="${esc(x.t)} löschen" style="width:46px;border:0;background:transparent;font-size:22px;cursor:pointer;color:var(--muted)">×</button></div>`;
+}
 function exHtml(){
   const L = exList(), have = new Set(L.map(x => String(x.t).toLowerCase()));
   const sug = XSUG.filter(s => !have.has(s.toLowerCase()));
-  const items = L.map((x, i) => `<div style="display:flex;align-items:stretch"><button class="ck" role="checkbox" aria-checked="${!!x.d}" data-exck="${i}" style="grid-template-columns:30px 1fr;flex:1"><i>${ck}</i><span class="l">${esc(x.t)}</span></button><button data-exdel="${i}" aria-label="${esc(x.t)} löschen" style="width:46px;border:0;background:transparent;font-size:22px;cursor:pointer;color:var(--muted)">×</button></div>`).join("");
+  const groups = groupManual(L).map(g => `<h3 class="sec">${esc(g.cat)}</h3><div class="box">${g.rows.map(exRow).join("")}</div>`).join("");
   const done = L.filter(x => x.d).length;
   return `<h3 class="sec">Eigene Artikel</h3><div class="box" style="padding:10px">
    <div style="display:flex;gap:8px"><input id="ex-i" placeholder="z. B. Küchenrolle" autocomplete="off" style="flex:1;min-height:46px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:500 17px inherit;padding:0 12px"><button class="btn pri" data-exadd style="min-width:96px">Hinzufügen</button></div>
    ${sug.length ? `<div class="vor" style="margin-top:8px">${sug.map(s => `<button data-exsug="${esc(s)}">${esc(s)}</button>`).join("")}</div>` : ""}
-   ${items ? `<div style="margin-top:8px">${items}</div>` : ""}
-   ${done ? `<button class="btn" data-exclr style="width:100%;margin-top:8px">Abgehakte entfernen</button>` : ""}
-  </div>`;
+  </div>
+  ${groups}
+  ${done ? `<button class="btn" data-exclr style="width:100%;margin-top:8px">Abgehakte entfernen</button>` : ""}`;
 }
 function exAdd(text){
   const t = String(text || "").trim();
