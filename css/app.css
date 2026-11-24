@@ -318,3 +318,15 @@ body:has(#mlp:not([hidden])) #toast{bottom:calc(168px + env(safe-area-inset-bott
 .scstep>button{min-height:46px;border-radius:10px;border:1px solid var(--line);background:var(--surface2);font-size:24px;line-height:1}
 .pkg button,.scday button{min-height:44px}
 .pkg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.idsum p{margin:0 0 6px;font-size:14px;line-height:1.4}
+.idsum b{font-weight:600}
+.box.idea{padding:12px;margin-bottom:10px}
+.idea .idn{display:block;font-size:18px;font-weight:600;line-height:1.25}
+.idea .idw{font-size:14px;margin:8px 0 0;line-height:1.4}
+.idea details{margin-top:8px}
+.idea summary{cursor:pointer;font-weight:600;min-height:36px;display:flex;align-items:center}
+.idea ul,.idea ol{margin:6px 0 0;padding-left:20px;font-size:15px;line-height:1.45}
+.idea ol{margin-top:10px}
+.idea .drow{margin-top:10px}
+.idea .drow .btn{padding:0 8px}
+.idmsg{margin:12px 2px}

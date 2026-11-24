@@ -14,6 +14,8 @@ import { openHh, bindSettings } from "./settings.js";
 import { readHash, wireHooks, initFirebase } from "./sync.js";
 import { setShareHook } from "./recipes.js";
 import { bindShare, openFriends, onRecipeEvent } from "./share.js";
+import { recordBuy } from "./buys.js";
+import { bindIdeas } from "./ideas.js";
 
 setShareHook((id, ev) => { if (ev === "friends") openFriends(); else onRecipeEvent(id, ev); });
 catalog.base = loadBuiltinRecipes();
@@ -100,7 +102,12 @@ function bindCore(){
       return;
     }
     if (d.sc !== undefined) {
-      if (ST.sc[d.sc]) delete ST.sc[d.sc]; else ST.sc[d.sc] = Date.now();
+      if (ST.sc[d.sc]) delete ST.sc[d.sc];
+      else {
+        ST.sc[d.sc] = Date.now();
+        const lab = String(d.sc).split("|");
+        if (lab[0] !== "V" && lab[1]) recordBuy(lab[1]);
+      }
       persist();
       const y = window.scrollY;
       render();
@@ -151,6 +158,7 @@ bindScanner();
 bindOcr();
 bindSettings();
 bindShare();
+bindIdeas();
 new MutationObserver(enhanceClear).observe(document.body, { childList:true, subtree:true });
 enhanceClear();
 render();
