@@ -3,6 +3,7 @@ import { $, esc, toast, ck, dkey } from "./util.js";
 import { CATS, shopList } from "./shopcalc.js";
 import { groupManual } from "./shop-cat.js";
 import { offersHtml, refreshOffers } from "./offers.js";
+import { recordBuy } from "./buys.js";
 
 export const CHECK_MS = 30 * 60 * 1000;
 
@@ -123,6 +124,7 @@ function exAdd(text){
   if (!t) { toast("Bitte einen Artikel eintragen"); return false; }
   const L = exList();
   if (L.some(x => String(x.t).toLowerCase() === t.toLowerCase())) { toast("Steht schon auf der Liste"); return false; }
+  recordBuy(t);
   L.push({ t:t.slice(0, 60), d:false });
   if (L.length > 100) L.shift();
   persist();
@@ -225,7 +227,7 @@ export function bindShopping(){
       const x = exList()[+d.exck];
       if (x) {
         x.d = !x.d;
-        if (x.d) x.at = Date.now(); else delete x.at;
+        if (x.d) { x.at = Date.now(); recordBuy(x.t); } else delete x.at;
         persist();
         exRender(false);
       }
